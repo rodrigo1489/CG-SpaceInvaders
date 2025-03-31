@@ -25,5 +25,5 @@ Esta versão tridimensional do *Space Invaders* inclui:
 
 - Diogo Edgar Dias Costa – al 79358  
 - Fernando Miguel Garcia Ribeiro – al 78482  
-- Pedro Miguel Pereira Mendes  
+- Pedro Miguel Pereira Mendes  - al 78140
 - Rodrigo José Gomes Fernandes – al 74580  
