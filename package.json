@@ -1,0 +1,16 @@
+{
+  "name": "space-invaders-3d",
+  "version": "1.0.0",
+  "description": "A 3D Space Invaders game using Three.js",
+  "main": "index.html",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "three": "^0.160.1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
