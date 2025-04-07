@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Invaders 3D</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="menu" class="overlay">
+            <h1>SPACE INVADERS</h1>
+            <div class="menu-content">
+                <div class="controls">
+                    <p>Arrow keys or A/D to move</p>
+                    <p>Space or Enter to shoot</p>
+                </div>
+                <div id="high-score">HIGH SCORE: 0</div>
+                <div id="highest-level">HIGHEST LEVEL: 1</div>
+                <select id="game-mode">
+                    <option value="action-cam">Action cam 3D</option>
+                    <option value="classic">Classic view</option>
+                </select>
+                <div class="debug-controls">
+                    <label for="debug-mode">
+                        <input type="checkbox" id="debug-mode">
+                        Debug Mode
+                    </label>
+                </div>
+                <button id="start-button">START GAME</button>
+            </div>
+            <div class="credits">
+                <p>© 2024 Space Invaders 3D</p>
+                <p class="signatures">Diogo Edgar Dias Costa • Fernando Miguel Garcia Ribeiro • Pedro Miguel Pereira Mendes • Rodrigo José Gomes Fernandes</p>
+            </div>
+        </div>
+
+        <div id="level-complete" class="overlay" style="display: none;">
+            <h1>LEVEL COMPLETE!</h1>
+            <div class="menu-content">
+                <div id="level-score">SCORE: 0</div>
+                <div id="current-level">LEVEL: 1</div>
+                <button id="next-level-button">NEXT LEVEL</button>
+            </div>
+        </div>
+
+        <div id="game-over" class="overlay" style="display: none;">
+            <h1>GAME OVER</h1>
+            <div class="menu-content">
+                <div id="final-score">FINAL SCORE: 0</div>
+                <div id="levels-completed">LEVELS COMPLETED: 0</div>
+                <button id="restart-button">PLAY AGAIN</button>
+            </div>
+        </div>
+
+        <canvas id="game-canvas"></canvas>
+        <div id="hud">
+            <div id="score">SCORE: 0</div>
+            <div id="lives">LIVES: 3</div>
+            <div id="level">LEVEL: 1</div>
+        </div>
+        <div id="debug-panel" style="display: none;">
+            <h3>Debug Info</h3>
+            <div id="debug-info"></div>
+            <div class="debug-buttons">
+                <button id="debug-invincible">Toggle Invincible</button>
+                <button id="debug-clear-enemies">Clear Enemies</button>
+                <button id="debug-next-level">Next Level</button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html> 
