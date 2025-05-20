@@ -4,33 +4,14 @@ import { Enemy } from './models/Enemy.js';
 import { Boss } from './models/Boss.js';
 import { Barrier } from './models/Barrier.js';
 import { GAME_CONFIG } from './utils/constants.js';
-import { MotherShip } from './models/MotherShip.js';
-
 
 class SpaceInvaders {
     constructor() {
         this.setupScene();
-        this.levelTransitionActive = false;   // estamos a mostrar a animação?
-        this.transitionStartTime   = 0;       // carimbo de arranque
-        this.transitionDuration    = 3000;    // ms de duração total
-        this.transitionPhase = 0;   // 0=círculo, 1=entrada na mothership
-        this.mothership            = null;    // Mesh da nave-mãe
-        this.playerStart           = null;    // pontos do arco
-        this.playerMid             = null;
-        this.playerFinal           = null;
-        this.shipSelectionActive = false;
-        this.availableShips      = [];   // Meshes das naves de escolha
-        this.selectedShipIndex   = null; // Índice da nave clicada
-        this.chosenShip      = null;    // referência à nave seleccionada
         this.setupLighting();
         this.setupGame();
         this.setupDebugMode();
         this.setupEventListeners();
-        if (sessionStorage.getItem('autoStart') === '1') {
-            sessionStorage.removeItem('autoStart');
-            this.selectedShipIndex = 0;       // ou qualquer nave por defeito
-            this.finaliseSelection();         // salta menu de naves
-        }
         this.animate();
     }
 
@@ -140,6 +121,7 @@ class SpaceInvaders {
         document.getElementById('highest-level').textContent = `HIGHEST LEVEL: ${this.highestLevel}`;
         this.updateHUD();
 
+        this.createLevel();
     }
 
     setupDebugMode() {
@@ -377,37 +359,6 @@ class SpaceInvaders {
             this.barriers.push(new Barrier(this.scene, position));
         }
     }
-    /*  -------- RESET SEM RELOAD --------- */
-    resetToLevel1() {
-        // 1. limpar arrays e cenas visuais
-        this.enemies.forEach(e => e.remove());
-        this.barriers.forEach(b => b.remove());
-        this.playerBullets.forEach(b => this.scene.remove(b));
-        this.enemyBullets.forEach(b => this.scene.remove(b));
-        this.enemies = [];
-        this.barriers = [];
-        this.playerBullets = [];
-        this.enemyBullets = [];
-
-        // 2. estado base
-        this.level = 1;
-        this.score = 0;
-        this.lives = 3;
-
-        // 3. HUD
-        this.updateHUD();
-
-        // 4. recria o nível 1
-        this.createLevel();
-
-        // 5. fecha eventuais sobreposições
-        document.getElementById('game-over'      ).style.display = 'none';
-        document.getElementById('pause-menu'     ).style.display = 'none';
-        document.getElementById('level-complete' ).style.display = 'none';
-
-        this.gameStarted = true;
-    }
-/*  -------- FIM RESET --------- */
 
     createStandardLevel() {
         // Standard level with enemy formation
@@ -506,123 +457,12 @@ class SpaceInvaders {
             document.getElementById('high-score').textContent = `HIGH SCORE: ${this.highScore}`;
         }
     }
-        /* ---------- MENU DE NAVE ---------- */
-    startShipSelection() {
-        this.shipSelectionActive = true;
-        document.getElementById('ship-selection').style.display = 'flex';
-
-        const shipCount = 4;       // quantas opções mostrar
-        const spacing   = 8;       // distância entre elas
-        const yPos      = 0;       // altura da fila
-
-        this.availableShips = [];  // (re)inicia o array
-
-        for (let i = 0; i < shipCount; i++) {
-            const p = new Player(this.scene, i);   // styleIndex = i
-            p.model.position.set(
-                (i - (shipCount-1)/2) * spacing,   // X em linha
-                yPos,
-                0                                   // Z = 0 (mesmo plano)
-            );
-            p.model.rotation.x = -Math.PI * 0.1;   // ligeiro tilt
-            p.model.userData.selfSpin = true;      // vai girar sobre si
-            this.availableShips.push(p.model);
-        }
-
-        this.raycaster = new THREE.Raycaster();
-        this.mouse     = new THREE.Vector2();
-        window.addEventListener('click',  e => this.handleShipClick(e));
-
-        /* não há órbita — por isso já não precisamos de shipOrbitActive */
-        this.chosenShip = null;
-        document.getElementById('hud').style.display = 'none';
-    }
-
-
-    handleShipClick(event) {
-        if (!this.shipSelectionActive) return;
-
-        // Converter posição do rato para NDC
-        this.mouse.x =  (event.clientX / window.innerWidth)  * 2 - 1;
-        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-
-        const hits = this.raycaster.intersectObjects(this.availableShips, true);
-        if (hits.length) this.chooseShip(hits[0].object);
-    }
-
-    chooseShip(mesh) {
-        const ship = this.availableShips.find(s => mesh === s || mesh.parent === s);
-        this.selectedShipIndex = this.availableShips.indexOf(ship);
-        this.chosenShip = ship;
-
-        // pára rotação das restantes
-        this.availableShips.forEach(s => {
-            s.userData.selfSpin = false;
-        });
-        ship.userData.selfSpin = true;   // opcional: a escolhida continua a girar
-
-        // destino da câmara
-        const target = new THREE.Vector3(ship.position.x, ship.position.y + 2, ship.position.z + 6);
-        this.cameraLerp = { start: this.camera.position.clone(), end: target, t: 0 };
-
-        document.getElementById('confirm-ship').style.display = 'block';
-    }
-
-
-    finaliseSelection() {
-
-
-        /* 2. remove o Player “placeholder” criado no setupGame() */
-        if (this.player && this.player.model){
-            this.scene.remove(this.player.model);
-        }
-
-        /* 3. cria o jogador definitivo com a skin escolhida */
-        this.player = new Player(this.scene, this.selectedShipIndex);
-
-        /* 4. limpa naves de escolha */
-        this.availableShips.forEach(s => this.scene.remove(s));
-        this.availableShips = [];
-        this.chosenShip = null;
-        this.shipSelectionActive = false;
-
-        /* 5. câmara volta à posição de jogo (UMA única vez) */
-        const mode = document.getElementById('game-mode').value;
-        if (mode === 'action-cam'){            // vista 3D inclinada
-            this.camera.position.set(0, -12, 15);
-            this.camera.lookAt(0, 5, 0);
-        } else {                               // vista 2D clássica
-            this.camera.position.set(0, 0, 30);
-            this.camera.lookAt(0, 0, 0);
-        }
-
-        /* 6. arranca nível 1 */
-        this.level = 1;
-        this.createLevel();
-        this.gameStarted = true;
-        document.getElementById('hud').style.display = 'block';
-        
-    }
-
-    /* ---------- FIM MENU DE NAVE ---------- */
 
     setupEventListeners() {
         this.keys = {};
         window.addEventListener('keydown', (e) => {
             this.keys[e.key] = true;
-            // ...já existe this.keys[e.key] = true;
-            if (e.key === 'Escape') {
-            // Se o jogo estiver a correr, abre o menu de pausa
-                if (this.gameStarted) {
-                    this.togglePauseMenu(true);
-                } else {
-                    // Se o menu de pausa estiver aberto, fecha-o e continua
-                    const pauseOpen = document.getElementById('pause-menu').style.display === 'flex';
-                    if (pauseOpen) this.togglePauseMenu(false);
-                }
-            }
-
+            
             // Debug keyboard shortcuts
             if (this.debugMode) {
                 // D + I = Toggle invincibility
@@ -682,22 +522,12 @@ class SpaceInvaders {
         const menuElement = document.getElementById('menu');
         const nextLevelButton = document.getElementById('next-level-button');
         const restartButton = document.getElementById('restart-button');
-        const resumeButton       = document.getElementById('resume-button');
-        const mainMenuButton     = document.getElementById('main-menu-button');
-        const restartButtonPause = document.getElementById('restart-button-pause');
 
         startButton.addEventListener('click', () => {
             menuElement.style.display = 'none';
+            this.gameStarted = true;
             document.querySelector('.credits').classList.add('hidden');
-            this.startShipSelection();          // <<< novo fluxo
         });
-
-        document.getElementById('confirm-ship')
-            .addEventListener('click', () => {
-                document.getElementById('ship-selection').style.display = 'none';
-                this.finaliseSelection();     // cria o Player definitivo e arranca o nível 1
-        });
-
 
         nextLevelButton.addEventListener('click', () => {
             document.getElementById('level-complete').style.display = 'none';
@@ -708,20 +538,10 @@ class SpaceInvaders {
         });
 
         restartButton.addEventListener('click', () => {
-            this.resetToLevel1();
+            document.getElementById('game-over').style.display = 'none';
+            document.querySelector('.credits').classList.remove('hidden');
+            location.reload();
         });
-        resumeButton.addEventListener('click', () => {
-            this.togglePauseMenu(false);
-        });
-
-        mainMenuButton.addEventListener('click', () => {
-            location.reload();        // recarrega tudo e volta ao menu inicial
-        });
-
-        restartButtonPause.addEventListener('click', () => {
-            this.resetToLevel1();         
-        });
-
 
         document.getElementById('game-mode').addEventListener('change', (e) => {
             const playerPos = this.player.getPosition();
@@ -777,79 +597,6 @@ class SpaceInvaders {
     }
 
     update() {
-        // Se estamos no ecrã de escolha, só roda as naves
-        if (this.shipSelectionActive) {
-            // Enquanto ninguém escolheu, todas giram sobre si próprias
-            if (!this.chosenShip) {
-                this.availableShips.forEach(s => {
-                    if (s.userData.selfSpin) s.rotation.y += 0.05;
-                });
-            } else {
-                // Depois da escolha, só a nave seleccionada roda
-                this.chosenShip.rotation.y += 0.05;
-            }       
-
-            // Animação de câmara (lerp) se existir
-            if (this.cameraLerp) {
-                this.cameraLerp.t += 0.03;
-                if (this.cameraLerp.t >= 1) {
-                    this.camera.position.copy(this.cameraLerp.end);
-                    this.cameraLerp = null;
-                } else {
-                    this.camera.position.lerpVectors(
-                        this.cameraLerp.start,
-                        this.cameraLerp.end,
-                        this.cameraLerp.t
-                    );
-                }
-                this.camera.lookAt(this.chosenShip ? this.chosenShip.position : new THREE.Vector3(0,0,0));
-            }
-
-            return;                     // não executa lógica do jogo
-        }
-        
-        /* ---------- cut-scene em curso ---------- */
- /* ---------- MINI-FILME ENTRE NÍVEIS ---------- */
-    if (this.levelTransitionActive) {
-
-        const now = performance.now();
-        const t   = (now - this.transitionStartTime) / this.transitionDuration;
-
-        if (this.transitionPhase === 0) {           // ── fase do círculo (0–0.6)
-            const k = Math.min(t / 0.6, 1);         // normaliza 0→1 nos 60 %
-            const angle = k * Math.PI * 2;          // volta completa
-            this.player.model.position.set(
-                this.circleCenter.x + this.circleRadius * Math.cos(angle),
-                this.circleCenter.y + 2 * Math.sin(angle), // pequena oscilação
-                0
-            );
-            this.player.model.rotation.y += 0.25;
-
-            if (k >= 1) {                           // mudou para fase 1
-                this.transitionPhase = 1;
-                this.phase1StartTime = now;
-            }
-        }
-        else {                                      // ── fase de entrada (restantes 40 %)
-            const k = Math.min((now - this.phase1StartTime) / 2000, 1); // 2 s
-            const pos = this.player.model.position;
-            pos.lerpVectors(pos, this.entryPoint, k); // aproximação linear
-            this.player.model.rotation.y += 0.15;
-
-            /* pulsar da mothership */
-            this.mothership.material.emissiveIntensity = 0.5 + 0.5*Math.sin(k*Math.PI*4);
-
-            if (k >= 1) this.endLevelTransition();
-        }
-
-        this.renderer.render(this.scene, this.camera);
-        return;                                      // tudo parado fora da cena
-    }
-
-
-
-
-
         if (!this.gameStarted) return;
 
         // Rotate starfield slightly for subtle movement
@@ -1213,7 +960,7 @@ class SpaceInvaders {
         document.getElementById('level').textContent = `LEVEL: ${this.level}`;
     }
 
-    showLevelOverlay() {
+    showLevelComplete() {
         this.gameStarted = false;
         document.getElementById('level-score').textContent = `SCORE: ${this.score}`;
         document.getElementById('current-level').textContent = `LEVEL: ${this.level}`;
@@ -1226,61 +973,6 @@ class SpaceInvaders {
             document.getElementById('highest-level').textContent = `HIGHEST LEVEL: ${this.highestLevel}`;
         }
     }
-    // --------- MINI-FILME ENTRE NÍVEIS -----------------
-    showLevelComplete() {
-
-        /* 1. pára o jogo e oculta HUD + restos de nível */
-        this.levelTransitionActive = true;
-        this.gameStarted           = false;
-        document.getElementById('hud').style.display = 'none';
-
-        /* remove barreiras e balas para limpar o ecrã */
-        this.barriers.forEach(b => b.remove());
-        this.barriers = [];
-        this.playerBullets.forEach(b => this.scene.remove(b));
-        this.enemyBullets.forEach(b => this.scene.remove(b));
-        this.playerBullets = [];
-        this.enemyBullets  = [];
-
-        /* 2. momento de arranque + duração total */
-        this.transitionStartTime = performance.now();
-        this.transitionDuration  = 5000;   // 3 s círculo + 2 s entrada
-        this.transitionPhase     = 0;      // começa no círculo
-
-        /* 3. mothership (disco simples) */
-        const g = new THREE.CylinderGeometry(6, 6, 2, 32);
-        const m = new THREE.MeshPhongMaterial({ color: 0x6666ff, emissive: 0x222266 });
-        this.mothership = new THREE.Mesh(g, m);
-        this.mothership.position.set(0, 12, 0);
-        this.scene.add(this.mothership);
-
-        /* 4. pontos do percurso */
-        this.circleRadius   = 10;
-        this.circleCenter   = new THREE.Vector3(0, 2, 0);
-        this.entryPoint     = new THREE.Vector3(0, 11, 0);   // boca da mothership
-    }
-
-// ---------- fim cut-scene ----------
-    endLevelTransition() {
-
-        /* remover nave-mãe */
-        this.scene.remove(this.mothership);
-        this.mothership.geometry.dispose();
-        this.mothership.material.dispose();
-        this.mothership = null;
-
-        /* recoloca a nave do jogador em baixo */
-        this.player.model.position.set(0, -8, 0);
-        this.player.model.rotation.set(-Math.PI*0.1, 0, 0);
-
-        /* mostrar HUD e overlay */
-        document.getElementById('hud').style.display = 'block';
-        this.levelTransitionActive = false;
-
-        /* overlay clássico */
-        this.showLevelOverlay();
-    }
-
 
     showGameOver() {
         this.gameStarted = false;
@@ -1301,12 +993,6 @@ class SpaceInvaders {
         this.update();
         this.renderer.render(this.scene, this.camera);
     }
-    togglePauseMenu(show) {
-        const pauseEl = document.getElementById('pause-menu');
-        pauseEl.style.display = show ? 'flex' : 'none';
-        this.gameStarted = !show;          // pára ou retoma o ciclo de update()
-}
-
 }
 
 // Start the game

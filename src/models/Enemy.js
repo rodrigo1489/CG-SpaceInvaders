@@ -1,194 +1,139 @@
-/*  Enemy.js  –  UFO procedural avançado  */
 import * as THREE from '/node_modules/three/build/three.module.js';
+import { VoxelModel } from '../utils/VoxelModel.js';
 import { COLORS } from '../utils/constants.js';
 
 export class Enemy {
+    constructor(scene, row, col) {
+        this.scene = scene;
+        this.row = row;
+        this.col = col;
+        this.createModel();
+        this.lastShot = 0;
+        this.shootingInterval = 3000 + Math.random() * 5000;
+        this.hitboxRadius = 1.0; // Reduced for more accurate collision detection
+        this.hitboxOffset = new THREE.Vector3(-0.2, 0, 0); // Offset slightly to the left, matching player
+        
+        // Movement parameters
+        this.amplitude = 0.02; // Default amplitude for side-to-side movement
+        this.frequency = 1;    // Default frequency for movement
+        
+        // Health and scoring
+        this.health = 1;       // Regular enemies die in one hit
+        this.pointValue = 100; // Base points for killing this enemy
+    }
 
-  constructor(scene, row, col) {
-      this.scene = scene;
-      this.row   = row;
-      this.col   = col;
+    createModel() {
+        const model = new VoxelModel();
+        
+        // Enemy base design
+        const baseLayer = [
+            [0,1,1,1,0],
+            [1,1,1,1,1],
+            [1,1,1,1,1],
+            [0,1,1,1,0]
+        ];
 
-      this.createModel();
+        // Top details
+        const topLayer = [
+            [1,0,1,0,1]
+        ];
 
-      /* combate */
-      this.lastShot         = 0;
-      this.shootingInterval = 2500 + Math.random() * 4000;
+        // Build the enemy from bottom to top
+        model.addLayer(baseLayer, 0, COLORS.ENEMY_BASE);
+        model.addLayer(topLayer, 1, COLORS.ENEMY_TOP);
+        
+        this.model = model.getModel();
+        
+        // Position enemies in straight lines
+        const xSpacing = 4;
+        const ySpacing = 3;
+        
+        this.model.position.set(
+            (this.col - 2) * xSpacing,    // X spacing
+            20 - this.row * ySpacing,     // Y position
+            0                             // All in same Z plane
+        );
+        
+        // Rotate to face down
+        this.model.rotation.x = Math.PI * 0.1; // Slight tilt for visibility
+        
+        this.scene.add(this.model);
+    }
 
-      /* colisão */
-      this.hitboxRadius = 1.8;
+    shoot() {
+        const now = Date.now();
+        if (now - this.lastShot < this.shootingInterval) return null;
+        
+        // Create bullet with metallic material
+        const bulletGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+        const bulletMaterial = new THREE.MeshStandardMaterial({ 
+            color: COLORS.ENEMY_BULLET,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+        
+        bullet.position.copy(this.model.position);
+        bullet.position.y -= 1;
+        
+        this.scene.add(bullet);
+        this.lastShot = now;
+        this.shootingInterval = 3000 + Math.random() * 5000;
+        
+        return bullet;
+    }
 
-      /* movimento */
-      this.amplitude  = 0.025;
-      this.frequency  = 1;
+    move(time) {
+        // Side-to-side movement with configurable amplitude and frequency
+        this.model.position.x += Math.sin(time * this.frequency) * this.amplitude;
+    }
 
-      /* vida / pontos */
-      this.health     = 1;
-      this.pointValue = 120;
-  }
+    remove() {
+        this.createExplosion();
+        this.scene.remove(this.model);
+    }
 
-  /* ─────────────────── construção do UFO ─────────────────── */
-  createModel() {
+    createExplosion() {
+        const explosionGeometry = new THREE.SphereGeometry(1, 8, 8);
+        const explosionMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true });
+        const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
+        explosion.position.copy(this.model.position);
+        this.scene.add(explosion);
 
-      const ufo = new THREE.Group();
+        // Animate explosion
+        const duration = 500; // milliseconds
+        const startTime = performance.now();
 
-      /* 1. disco principal (LatheGeometry) */
-      const profile = [];
-      profile.push(new THREE.Vector2( 0.0,  0.0));
-      profile.push(new THREE.Vector2( 2.0,  0.0));
-      profile.push(new THREE.Vector2( 2.2,  0.25));
-      profile.push(new THREE.Vector2( 1.4,  0.6));
-      profile.push(new THREE.Vector2( 0.8,  0.75));
-      profile.push(new THREE.Vector2( 0.0,  0.8));
-      const diskGeo = new THREE.LatheGeometry(profile, 64);
-      const diskMat = new THREE.MeshStandardMaterial({
-          color: COLORS.ENEMY_BASE,
-          metalness: 0.85,
-          roughness: 0.3
-      });
-      const disk = new THREE.Mesh(diskGeo, diskMat);
-      disk.castShadow = disk.receiveShadow = true;
-      ufo.add(disk);
+        const animateExplosion = (time) => {
+            const elapsed = time - startTime;
+            const progress = elapsed / duration;
 
-      /* 2. cúpula transparente */
-      const dome = new THREE.Mesh(
-          new THREE.SphereGeometry(0.9, 32, 24, 0, Math.PI * 2, 0, Math.PI / 2),
-          new THREE.MeshPhysicalMaterial({
-              color: 0x88bbff,
-              metalness: 0,
-              roughness: 0,
-              transmission: 0.9,
-              thickness: 0.1
-          })
-      );
-      dome.position.y = 0.8;
-      ufo.add(dome);
+            if (progress < 1) {
+                explosion.scale.set(progress * 3, progress * 3, progress * 3);
+                explosion.material.opacity = 1 - progress;
+                requestAnimationFrame(animateExplosion);
+            } else {
+                this.scene.remove(explosion);
+            }
+        };
 
-      /* 3. anel luminoso (torus) */
-      const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(1.6, 0.12, 16, 48),
-          new THREE.MeshBasicMaterial({
-              color: 0x44ff88,
-              emissive: 0x44ff88,
-              emissiveIntensity: 1
-          })
-      );
-      ring.rotation.x = Math.PI / 2;
-      ring.position.y = 0.35;
-      ufo.add(ring);
-      this.ring = ring;           // para animação de brilho
+        requestAnimationFrame(animateExplosion);
+    }
 
-      /* 4. janelas (pequenos emissores) */
-      const windowMat = new THREE.MeshBasicMaterial({ color: 0x66ccff });
-      const windowGeo = new THREE.BoxGeometry(0.15, 0.05, 0.3);
-      for (let i = 0; i < 12; i++) {
-          const w = new THREE.Mesh(windowGeo, windowMat);
-          const angle = (i / 12) * Math.PI * 2;
-          w.position.set(Math.cos(angle) * 1.4, 0.55, Math.sin(angle) * 1.4);
-          w.lookAt(0, 0.55, 0);
-          ufo.add(w);
-      }
-
-      /* 5. feixe de “abdução” (cone transparente) */
-      const beamGeo = new THREE.ConeGeometry(0.1, 3.5, 32, 1, true);
-      beamGeo.translate(0, -1.75, 0);
-      const beamMat = new THREE.MeshBasicMaterial({
-          color: 0x55ffff,
-          transparent: true,
-          opacity: 0.25,
-          side: THREE.DoubleSide
-      });
-      const beam = new THREE.Mesh(beamGeo, beamMat);
-      beam.position.y = -0.1;
-      ufo.add(beam);
-      this.beam = beam;           // guardamos para animação
-
-      /* 6. posiciona na grelha */
-      const xSpacing = 4;
-      const ySpacing = 3;
-      ufo.position.set(
-          (this.col - 2) * xSpacing,
-          20 - this.row  * ySpacing,
-          0
-      );
-
-      ufo.traverse(o => o.castShadow = o.receiveShadow = true);
-
-      this.model = ufo;
-      this.scene.add(this.model);
-      this.model.rotation.x = Math.PI/2;
-      this.beam.rotation.x = -Math.PI / 2;
-  }
-
-  /* ───────── disparo ───────── */
-  shoot() {
-      const now = Date.now();
-      if (now - this.lastShot < this.shootingInterval) return null;
-
-      const bullet = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8),
-          new THREE.MeshBasicMaterial({ color: COLORS.ENEMY_BULLET })
-      );
-      bullet.rotateX(Math.PI/2);
-      bullet.position.copy(this.model.position);
-      bullet.position.y -= 1.3;
-      this.scene.add(bullet);
-
-      this.lastShot = now;
-      this.shootingInterval = 2500 + Math.random() * 4000;
-      return bullet;
-  }
-
-  /* ───────── movimento & animação ───────── */
-  move(time) {
-      // deslocação lateral
-      this.model.position.x += Math.sin(time * this.frequency) * this.amplitude;
-
-      // brilho pulsante no anel
-      this.ring.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(time * 6 + this.col);
-
-      // efeito respirante no feixe
-      const s = 0.6 + 0.4 * Math.sin(time * 4);
-      this.beam.scale.set(s, 1, s);
-      this.beam.material.opacity = 0.15 + 0.1 * (s - 0.6);
-  }
-
-  /* ───────── destruição ───────── */
-  remove() {
-      this.createExplosion();
-      this.scene.remove(this.model);
-      this.model.traverse(o => {
-          if (o.geometry) o.geometry.dispose();
-          if (o.material) o.material.dispose();
-      });
-  }
-
-  createExplosion() {
-      const boom = new THREE.Mesh(
-          new THREE.SphereGeometry(1.2, 12, 12),
-          new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true })
-      );
-      boom.position.copy(this.model.position);
-      this.scene.add(boom);
-
-      const t0 = performance.now(), dur = 600;
-
-      const step = (t) => {
-          const k = (t - t0) / dur;
-          if (k < 1) {
-              boom.scale.setScalar(k * 4);
-              boom.material.opacity = 1 - k;
-              requestAnimationFrame(step);
-          } else {
-              this.scene.remove(boom);
-              boom.geometry.dispose();
-              boom.material.dispose();
-          }
-      };
-      requestAnimationFrame(step);
-  }
-
-  /* ───────── utilitários ───────── */
-  getPosition()      { return this.model.position.clone(); }
-  takeDamage(d = 1)  { this.health -= d; return this.health <= 0; }
-}
+    getPosition() {
+        // Return position with offset for more accurate hitbox
+        const position = this.model.position.clone();
+        position.add(this.hitboxOffset);
+        return position;
+    }
+    
+    /**
+     * Take damage and return true if destroyed
+     * @param {number} amount - Amount of damage to take
+     * @returns {boolean} - Whether the enemy was destroyed
+     */
+    takeDamage(amount = 1) {
+        this.health -= amount;
+        return this.health <= 0;
+    }
+} 
