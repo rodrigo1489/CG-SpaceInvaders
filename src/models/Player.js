@@ -49,75 +49,154 @@ export class Player {
      * Build the voxel model and insert it into the scene.
      */
     createModel() {
-        const model = new VoxelModel();
+    const group = new THREE.Group();
+    const scheme = SHIP_SCHEMES[this.styleIndex % SHIP_SCHEMES.length];
+    const baseMat = new THREE.MeshStandardMaterial({ color: scheme.base });
+    const topMat = new THREE.MeshStandardMaterial({ color: scheme.top });
 
-        // Voxel layers that define the spaceship shape
-        const baseLayer = [
-            [0,0,1,1,1,0,0],
-            [0,1,1,1,1,1,0],
-            [1,1,1,1,1,1,1]
-        ];
-        const middleLayer = [
-            [0,0,0,1,0,0,0],
-            [0,1,1,1,1,1,0]
-        ];
-        const topLayer = [
-            [0,0,0,1,0,0,0],
-            [0,0,1,1,1,0,0]
-        ];
+    let bulletOrigin = new THREE.Vector3();
 
-        // Pick the colour scheme (wrap index safely)
-        const scheme = SHIP_SCHEMES[this.styleIndex % SHIP_SCHEMES.length];
+    if (this.styleIndex === 0) {
+        // Nave 1
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2.5, 16), baseMat);
+        body.rotation.z = Math.PI/2;
+        group.add(body);
 
-        // Build the spaceship from bottom to top
-        model.addLayer(baseLayer,   0, scheme.base);
-        model.addLayer(middleLayer, 1, scheme.top);
-        model.addLayer(topLayer,    2, scheme.top);
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), topMat);
+        cockpit.position.set(0.6, 0.2, 0);
+        group.add(cockpit);
 
-        this.model = model.getModel();
+        for (let side of [-1, 1]) {
+            const wing = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 1.8), baseMat);
+            wing.position.set(-0.3, -0.3, side * 1);
+            wing.rotation.y = side * Math.PI / 8;
+            group.add(wing);
+        }
 
-        // Position player at bottom of screen
-        this.model.position.set(0, -8, 0);
-
-        // Slight tilt for visibility in 3D cameras
-        this.model.rotation.x = -Math.PI * 0.1;
-
-        this.scene.add(this.model);
-        this.lastShot = 0;
-        this.shootingCooldown = 500; // 500 ms between shots
+        bulletOrigin.set(1.5, 0, 0);
     }
+
+    else if (this.styleIndex === 1) {
+        // Nave 2
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.6), baseMat);
+        group.add(body);
+
+        const cockpit = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.6, 16), topMat);
+        cockpit.rotation.z = Math.PI / 2;
+        cockpit.position.set(0.2, 0.3, 0);
+        group.add(cockpit);
+
+        for (let side of [-1, 1]) {
+            const wing = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 1.4), baseMat);
+            wing.rotation.x = side * Math.PI / 8;
+            wing.position.set(-0.4, -0.1, side * 0.9);
+            group.add(wing);
+        }
+
+        const boosters = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8), baseMat);
+        boosters.rotation.z = Math.PI / 2;
+        boosters.position.set(-0.9, -0.2, 0);
+        group.add(boosters);
+
+        bulletOrigin.set(0.7, 0, 0);
+    }
+
+    else if (this.styleIndex === 2) {
+        // Nave 3
+        const fuselage = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.3, 0.5), baseMat);
+        group.add(fuselage);
+
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), topMat);
+        cockpit.position.set(0.5, 0.25, 0);
+        group.add(cockpit);
+
+        const wings = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 1.6), baseMat);
+        for (let side of [-1, 1]) {
+            const wingClone = wings.clone();
+            wingClone.position.set(-0.2, -0.1, side * 0.9);
+            group.add(wingClone);
+        }
+
+        for (let side of [-1, 1]) {
+            const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 12), baseMat);
+            engine.rotation.z = Math.PI / 2;
+            engine.position.set(-0.8, -0.15, side * 0.5);
+            group.add(engine);
+        }
+
+        bulletOrigin.set(0.9, 0, 0);
+    }
+
+    else if (this.styleIndex === 3) {
+    //Nave 4
+    const mainBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, 0.8), baseMat);
+    group.add(mainBody);
+
+    // Cockpit duplo
+    for (let i of [-0.3, 0.3]) {
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), topMat);
+        cockpit.position.set(0.5, 0.3, i);
+        group.add(cockpit);
+    }
+
+    // Motores laterais
+    for (let side of [-1, 1]) {
+        const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 12), baseMat);
+        engine.rotation.z = Math.PI / 2;
+        engine.position.set(-0.9, -0.1, side * 0.4);
+        group.add(engine);
+    }
+
+    // Detalhes técnicos
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.05, 0.5), topMat);
+    plate.position.set(0, 0.25, 0);
+    group.add(plate);
+
+    const cannon = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), topMat);
+    cannon.position.set(1.1, 0, 0);
+    group.add(cannon);
+
+    bulletOrigin.set(1.2, 0, 0);
+}
+
+
+    group.position.set(0, -8, 0);
+    group.rotation.x = -Math.PI * 0.1;
+    this.model = group;
+    this.scene.add(this.model);
+    this.bulletOffset = bulletOrigin;
+
+    this.lastShot = 0;
+    this.shootingCooldown = 500;
+}
+
+
+
 
     shoot() {
-        const now = Date.now();
-        if (now - this.lastShot < this.shootingCooldown) return null;
+    const now = Date.now();
+    if (now - this.lastShot < this.shootingCooldown) return null;
 
-        // Create bullet with metallic material
-        const bulletGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-        const bulletMaterial = new THREE.MeshStandardMaterial({
-            color: COLORS.PLAYER_BULLET,
-            metalness: 0.8,
-            roughness: 0.2
-        });
-        const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+    const bulletGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+    const bulletMaterial = new THREE.MeshStandardMaterial({
+        color: COLORS.PLAYER_BULLET,
+        metalness: 0.8,
+        roughness: 0.2
+    });
+    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
 
-        // Position bullet just above the ship
-        bullet.position.set(
-            this.model.position.x,
-            this.model.position.y + 1,
-            0
-        );
+    const origin = this.bulletOffset.clone().applyMatrix4(this.model.matrixWorld);
+    bullet.position.copy(origin);
 
-        // Mark this as a player bullet for special collision handling
-        bullet.userData = { isPlayerBullet: true };
+    bullet.userData = { isPlayerBullet: true };
 
-        this.scene.add(bullet);
-        this.lastShot = now;
+    this.scene.add(bullet);
+    this.lastShot = Date.now();
+    this.debugStats.shotsFired++;
 
-        // Debug
-        this.debugStats.shotsFired++;
+    return bullet;
+}
 
-        return bullet;
-    }
 
     move(direction) {
         const speed = 0.15;
