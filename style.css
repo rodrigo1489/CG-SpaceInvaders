@@ -281,3 +281,14 @@ select:focus, button:focus {
     letter-spacing: 0.5px;
     margin-top: 5px;
 } 
+/* acrescenta no fim do style.css */
+/* Ship-selection sem véu escuro nem bloqueio de rato */
+#ship-selection.overlay{
+  background: none !important;
+  pointer-events: none;
+}
+#ship-selection button{
+  pointer-events: auto;
+}
+
+
