@@ -11,19 +11,40 @@
         <div id="menu" class="overlay">
             <h1>SPACE INVADERS</h1>
             <div class="menu-content">
+                <div class="controls">
+                    <p>Arrow keys or A/D to move</p>
+                    <p>Space or Enter to shoot</p>
+                </div>
                 <div id="high-score">HIGH SCORE: 0</div>
                 <div id="highest-level">HIGHEST LEVEL: 1</div>
                 <select id="game-mode">
                     <option value="action-cam">Action cam 3D</option>
                     <option value="classic">Classic view</option>
                 </select>
+                <div class="debug-controls">
+                    <label for="debug-mode">
+                        <input type="checkbox" id="debug-mode">
+                        Debug Mode
+                    </label>
+                </div>
                 <button id="start-button">START GAME</button>
             </div>
-            <div class="controls">
-                <p>Arrow keys to move</p>
-                <p>Space or Enter to shoot</p>
+            <div class="credits">
+                <p>© 2024 Space Invaders 3D</p>
+                <p class="signatures">Diogo Edgar Dias Costa • Fernando Miguel Garcia Ribeiro • Pedro Miguel Pereira Mendes • Rodrigo José Gomes Fernandes</p>
             </div>
         </div>
+        <!-- SHIP SELECTION -->
+        <div id="ship-selection" class="overlay" style="display:none;">
+            <h1>ESCOLHE A TUA NAVE</h1>
+
+        <!-- Instruções básicas -->
+            <p>Clica na nave que preferes</p>
+
+        <!-- Botão só aparece depois de escolher -->
+            <button id="confirm-ship" style="display:none;">COMEÇAR MISSÃO</button>
+        </div>
+
 
         <div id="level-complete" class="overlay" style="display: none;">
             <h1>LEVEL COMPLETE!</h1>
@@ -42,12 +63,28 @@
                 <button id="restart-button">PLAY AGAIN</button>
             </div>
         </div>
-
+        <div id="pause-menu" class="overlay" style="display:none;">
+            <h1>PAUSA</h1>
+            <div class="menu-content">
+                <button id="resume-button">CONTINUAR</button>
+                <button id="main-menu-button">MENU PRINCIPAL</button>
+                <button id="restart-button-pause">REINICIAR</button>
+            </div>
+        </div>
         <canvas id="game-canvas"></canvas>
         <div id="hud">
             <div id="score">SCORE: 0</div>
             <div id="lives">LIVES: 3</div>
             <div id="level">LEVEL: 1</div>
+        </div>
+        <div id="debug-panel" style="display: none;">
+            <h3>Debug Info</h3>
+                <div id="debug-info"></div>
+            <div class="debug-buttons">
+                <button id="debug-invincible">Toggle Invincible</button>
+                <button id="debug-clear-enemies">Clear Enemies</button>
+                <button id="debug-next-level">Next Level</button>
+            </div>
         </div>
     </div>
     <script type="module" src="/src/main.js"></script>
