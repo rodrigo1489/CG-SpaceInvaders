@@ -524,7 +524,6 @@ class SpaceInvaders {
                 yPos,
                 0                                   // Z = 0 (mesmo plano)
             );
-            p.model.rotation.x = -Math.PI * 0.1;   // ligeiro tilt
             p.model.userData.selfSpin = true;      // vai girar sobre si
             this.availableShips.push(p.model);
         }
@@ -1270,8 +1269,10 @@ class SpaceInvaders {
         this.mothership = null;
 
         /* recoloca a nave do jogador em baixo */
-        this.player.model.position.set(0, -8, 0);
-        this.player.model.rotation.set(-Math.PI*0.1, 0, 0);
+       this.player.model.position.set(0, -8, 0);
+       this.player.model.rotation.set(Math.PI * 1.2, Math.PI * 0.5, Math.PI);
+
+;
 
         /* mostrar HUD e overlay */
         document.getElementById('hud').style.display = 'block';
