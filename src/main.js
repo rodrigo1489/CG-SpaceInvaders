@@ -98,22 +98,14 @@ class SpaceInvaders {
     }
 
     setupLighting() {
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        this.scene.add(ambientLight);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // aumenta a intensidade aqui (1.0 ou mais)
+    this.scene.add(ambientLight);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(5, 5, 5);
-        this.scene.add(directionalLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // aumenta aqui também
+    directionalLight.position.set(5, 5, 5);
+    this.scene.add(directionalLight);
+}
 
-        // Add point lights for dramatic effect
-        const pointLight1 = new THREE.PointLight(0xff0000, 0.5, 50);
-        pointLight1.position.set(-20, 15, 10);
-        this.scene.add(pointLight1);
-
-        const pointLight2 = new THREE.PointLight(0x00ff00, 0.5, 50);
-        pointLight2.position.set(20, 15, 10);
-        this.scene.add(pointLight2);
-    }
 
     setupGame() {
         this.gameStarted = false;
@@ -524,7 +516,6 @@ class SpaceInvaders {
                 yPos,
                 0                                   // Z = 0 (mesmo plano)
             );
-            p.model.rotation.x = -Math.PI * 0.1;   // ligeiro tilt
             p.model.userData.selfSpin = true;      // vai girar sobre si
             this.availableShips.push(p.model);
         }
@@ -1270,8 +1261,10 @@ class SpaceInvaders {
         this.mothership = null;
 
         /* recoloca a nave do jogador em baixo */
-        this.player.model.position.set(0, -8, 0);
-        this.player.model.rotation.set(-Math.PI*0.1, 0, 0);
+       this.player.model.position.set(0, -8, 0);
+       this.player.model.rotation.set(Math.PI * 1.2, Math.PI * 0.5, Math.PI);
+
+;
 
         /* mostrar HUD e overlay */
         document.getElementById('hud').style.display = 'block';
