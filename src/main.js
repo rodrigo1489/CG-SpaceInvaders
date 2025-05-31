@@ -503,7 +503,7 @@ updateSun(delta) {
         
         // Keep spacing consistent regardless of level
         const enemySpacing = 5;
-        const enemyRowSpacing = 3;
+        const enemyRowSpacing = 4.5;
         const enemyOffset = -(enemyCols * enemySpacing) / 2 + enemySpacing/2;
         
         // Create a formation with a consistent height

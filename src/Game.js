@@ -120,7 +120,7 @@ export class Game {
     createEnemies() {
         const rows = GAME_CONFIG.ENEMY_ROWS;
         const cols = GAME_CONFIG.ENEMY_COLS;
-        const spacing = 2;
+        const spacing = 100;
         
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
