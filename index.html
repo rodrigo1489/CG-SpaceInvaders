@@ -1,51 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.157.0/build/three.module.js"
-  }
-}
-</script>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Space Invaders 3D</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Ajustes para o menu de seleção de nave */
-        #ship-selection {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        #ship-selection h1 {
-            font-size: 3em;
-            margin-top: 40px; /* move título para cima */
-            margin-bottom: 10px;
-            pointer-events: auto;
-        }
-
-        #ship-selection p {
-            font-size: 1.2em;
-            margin-top: 160px; /* empurra o texto para baixo das naves */
-            pointer-events: auto;
-        }
-
-        #confirm-ship {
-            margin-top: 40px; /* move botão para baixo */
-            font-size: 1.2em;
-            padding: 10px 20px;
-            pointer-events: auto;
-        }
-    </style>
 </head>
 <body>
     <div id="game-container">
@@ -75,13 +34,17 @@
                 <p class="signatures">Diogo Edgar Dias Costa • Fernando Miguel Garcia Ribeiro • Pedro Miguel Pereira Mendes • Rodrigo José Gomes Fernandes</p>
             </div>
         </div>
-
         <!-- SHIP SELECTION -->
         <div id="ship-selection" class="overlay" style="display:none;">
             <h1>ESCOLHE A TUA NAVE</h1>
+
+        <!-- Instruções básicas -->
             <p>Clica na nave que preferes</p>
+
+        <!-- Botão só aparece depois de escolher -->
             <button id="confirm-ship" style="display:none;">COMEÇAR MISSÃO</button>
         </div>
+
 
         <div id="level-complete" class="overlay" style="display: none;">
             <h1>LEVEL COMPLETE!</h1>
@@ -100,7 +63,6 @@
                 <button id="restart-button">PLAY AGAIN</button>
             </div>
         </div>
-
         <div id="pause-menu" class="overlay" style="display:none;">
             <h1>PAUSA</h1>
             <div class="menu-content">

@@ -97,15 +97,53 @@ class SpaceInvaders {
         }
     }
 
+    createSun() {
+        // Glowing sun sphere
+        const sunGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const sunMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffdd66,
+            emissive: 0xffaa00,
+            emissiveIntensity: 2.5
+        });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        sun.position.set(-10, 20, 10);
+        this.scene.add(sun);
+    
+        // Directional sunlight
+        const sunlight = new THREE.DirectionalLight(0xffddaa, 2);
+        sunlight.position.set(-10, 20, 10);
+        sunlight.castShadow = true;
+    
+        // 💡 Point the light at the scene's center
+        sunlight.target.position.set(-0.16, -10, );
+        this.scene.add(sunlight.target); // Required!
+    
+        this.scene.add(sunlight);
+    
+        // Optional helper
+        const helper = new THREE.DirectionalLightHelper(sunlight, 5);
+        this.scene.add(helper);
+    }
+    
     setupLighting() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // aumenta a intensidade aqui (1.0 ou mais)
-    this.scene.add(ambientLight);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        this.scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // aumenta aqui também
-    directionalLight.position.set(5, 5, 5);
-    this.scene.add(directionalLight);
-}
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        this.scene.add(directionalLight);
 
+        // Add point lights for dramatic effect
+        const pointLight1 = new THREE.PointLight(0xff0000, 0.5, 50);
+        pointLight1.position.set(-20, 15, 10);
+        this.scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0x00ff00, 0.5, 50);
+        pointLight2.position.set(20, 15, 10);
+        this.scene.add(pointLight2);
+        
+    this.createSun();
+    }
 
     setupGame() {
         this.gameStarted = false;
@@ -516,6 +554,7 @@ class SpaceInvaders {
                 yPos,
                 0                                   // Z = 0 (mesmo plano)
             );
+            p.model.rotation.x = -Math.PI * 0.1;   // ligeiro tilt
             p.model.userData.selfSpin = true;      // vai girar sobre si
             this.availableShips.push(p.model);
         }
@@ -1261,10 +1300,8 @@ class SpaceInvaders {
         this.mothership = null;
 
         /* recoloca a nave do jogador em baixo */
-       this.player.model.position.set(0, -8, 0);
-       this.player.model.rotation.set(Math.PI * 1.2, Math.PI * 0.5, Math.PI);
-
-;
+        this.player.model.position.set(0, -8, 0);
+        this.player.model.rotation.set(-Math.PI*0.1, 0, 0);
 
         /* mostrar HUD e overlay */
         document.getElementById('hud').style.display = 'block';
