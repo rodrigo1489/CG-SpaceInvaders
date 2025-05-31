@@ -97,33 +97,90 @@ class SpaceInvaders {
         }
     }
 
-    createSun() {
-        // Glowing sun sphere
-        const sunGeometry = new THREE.SphereGeometry(2, 32, 32);
-        const sunMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffdd66,
-            emissive: 0xffaa00,
-            emissiveIntensity: 2.5
-        });
-        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-        sun.position.set(-10, 20, 10);
-        this.scene.add(sun);
-    
-        // Directional sunlight
-        const sunlight = new THREE.DirectionalLight(0xffddaa, 2);
-        sunlight.position.set(-10, 20, 10);
-        sunlight.castShadow = true;
-    
-        // 💡 Point the light at the scene's center
-        sunlight.target.position.set(-0.16, -10, );
-        this.scene.add(sunlight.target); // Required!
-    
-        this.scene.add(sunlight);
-    
-        // Optional helper
-        const helper = new THREE.DirectionalLightHelper(sunlight, 5);
-        this.scene.add(helper);
+createSun() {
+  const loader = new THREE.TextureLoader();
+
+  /* ───── texturas ───── */
+  const baseTex  = loader.load('/src/textures/sun_surface.png');
+  const noiseTex = loader.load('/src/textures/sun_noise.png');
+  noiseTex.wrapS = noiseTex.wrapT = THREE.RepeatWrapping;
+
+  /* ───── shaders ───── */
+  const uniforms = {
+    time:       { value: 0 },
+    baseTex:    { value: baseTex },
+    noiseTex:   { value: noiseTex },
+    noiseScale: { value: 2.0 },
+    emissive:   { value: new THREE.Color(0xffaa00) }
+  };
+
+  const vertexShader = /* glsl */`
+    varying vec2 vUv;
+    uniform float time;
+    uniform sampler2D noiseTex;
+    uniform float noiseScale;
+    void main() {
+      vUv = uv;
+      // deslocamento sutil dos vértices para "ferver" a superfície
+      vec3 newPos = position +
+          normal * 0.55 *
+          (texture2D(noiseTex, uv * noiseScale + time * 0.02).r - 0.5);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
     }
+  `;
+
+  const fragmentShader = /* glsl */`
+    varying vec2 vUv;
+    uniform sampler2D baseTex;
+    uniform sampler2D noiseTex;
+    uniform float time;
+    uniform float noiseScale;
+    uniform vec3  emissive;
+    void main() {
+      // cor base
+      vec3 baseCol = texture2D(baseTex, vUv * 4.0).rgb;
+
+      // ruído animado para labaredas
+      float n = texture2D(noiseTex, vUv * noiseScale * 1.8 + vec2(time*0.12, time*0.08)).r;
+      float n2= texture2D(noiseTex, vUv * noiseScale * 2.6 - vec2(time*0.07, time*0.11)).r;
+
+      float flame = smoothstep(0.3, 1.0, n + n2 * 0.5);
+
+      vec3 color = mix(baseCol, emissive * 1.6, flame);   // 1.6 ≈ +60 % brilho
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  const sunMaterial = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader,
+    fragmentShader
+  });
+
+  /* ───── esfera do sol ───── */
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(2, 64, 64), sunMaterial);
+  sun.position.set(-10, 20, 10);
+  this.scene.add(sun);
+
+  /* ───── luz direcional ───── */
+  const sunlight = new THREE.DirectionalLight(0xffddaa, 2);
+  sunlight.position.copy(sun.position);
+  sunlight.target.position.set(0, 0, 0);
+  this.scene.add(sunlight.target);
+  this.scene.add(sunlight);
+
+  /* (opcional) helper */
+  // const helper = new THREE.DirectionalLightHelper(sunlight, 5);
+  // this.scene.add(helper);
+
+  /* guardar referências p/ animação */
+  this._sunUniforms = uniforms;
+}
+
+updateSun(delta) {
+  if (this._sunUniforms) this._sunUniforms.time.value += delta;
+}
+
     
     setupLighting() {
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
