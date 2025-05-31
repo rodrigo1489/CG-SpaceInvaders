@@ -1,4 +1,4 @@
-/*  MotherShip.js — “Death-Star” procedural  */
+SS/*  MotherShip.js — “Death-Star” procedural  */
 
 import * as THREE from '/node_modules/three/build/three.module.js';
 
@@ -100,11 +100,7 @@ export class MotherShip {
     }
 
     /* ────────── util ────────── */
+
     remove() {
-        this.scene.remove(this.model);
-        this.model.traverse(o => {
-            if (o.geometry) o.geometry.dispose();
             if (o.material) o.material.dispose();
-        });
-    }
-}
+}}
