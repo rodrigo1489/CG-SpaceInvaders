@@ -1,11 +1,18 @@
 import * as THREE from '/node_modules/three/build/three.module.js';
-import { COLORS } from '../utils/constants.js';
+import { VoxelModel } from '../utils/VoxelModel.js';
+import { COLORS, GAME_CONFIG } from '../utils/constants.js';
 
-const loader = new THREE.TextureLoader();
-const texture = loader.load('/src/textures/Spaceship.png');
+/*
+ * Palette of color schemes for the different player ships.
+ */
+export const SHIP_SCHEMES = [
+  { base: COLORS.PLAYER_BASE, top: COLORS.PLAYER_TOP },
+  { base: 0xff5522,           top: 0xffff88 },
+  { base: 0x22ff55,           top: 0xb0ffb0 },
+  { base: 0xaa66ff,           top: 0xffffff }
+];
 
 export class Player {
-
     constructor(scene, styleIndex = 0) {
         this.scene = scene;
         this.styleIndex = styleIndex;
@@ -126,32 +133,16 @@ export class Player {
         return true;
     }
 
-    shoot() {
-    const now = Date.now();
-    if (now - this.lastShot < 500) return null;
-
-    const bulletGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-    const bulletMaterial = new THREE.MeshStandardMaterial({
-        color: COLORS.PLAYER_BULLET,
-        metalness: 0.8,
-        roughness: 0.2
-    });
-
-    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-    const origin = new THREE.Vector3(0, 0, 0).applyMatrix4(this.model.matrixWorld);
-    bullet.position.copy(origin);
-
-    bullet.userData = { isPlayerBullet: true };
-
-    this.scene.add(bullet);
-    this.lastShot = Date.now();
-    this.debugStats.shotsFired++;
-
-    return bullet;
+    getDebugInfo() {
+        return {
+            position: this.model.position.clone(),
+            isInvulnerable: this.isInvulnerable,
+            canShoot: this.canShoot,
+            shotsFired: this.debugStats.shotsFired,
+            timesHit: this.debugStats.timesHit,
+            distanceMoved: this.debugStats.distanceMoved.toFixed(2),
+            hitboxRadius: this.hitboxRadius,
+            styleIndex: this.styleIndex
+        };
+    }
 }
-
-
-}
-
-
-
