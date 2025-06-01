@@ -14,7 +14,6 @@ addVoxel(x, y, z, color, textureName = null) {
         const texture = new THREE.TextureLoader().load('src/Textures/barrier.jpeg');
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.repeat.set(1, 1);
         texture.minFilter = THREE.LinearFilter;
         material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -25,7 +24,6 @@ addVoxel(x, y, z, color, textureName = null) {
         const texture = new THREE.TextureLoader().load('src/Textures/nave.png');
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.repeat.set(1, 1);
         texture.minFilter = THREE.LinearFilter;
         material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -38,8 +36,13 @@ addVoxel(x, y, z, color, textureName = null) {
 
     const voxel = new THREE.Mesh(geometry, material);
     voxel.position.set(x * VOXEL_SIZE, y * VOXEL_SIZE, z * VOXEL_SIZE);
+
+    voxel.castShadow = true;
+    voxel.receiveShadow = true;
+
     this.voxels.add(voxel);
 }
+
 
   addLayer(layer, y, color, z = 0, textureName = null) {
     for (let zIndex = 0; zIndex < layer.length; zIndex++) {

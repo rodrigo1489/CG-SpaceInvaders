@@ -5,7 +5,7 @@ import { Boss } from './models/Boss.js';
 import { Barrier } from './models/Barrier.js';
 import { GAME_CONFIG } from './utils/constants.js';
 import { MotherShip } from './models/MotherShip.js';
-
+import { GlassPlane } from './models/Vidro.js';
 
 class SpaceInvaders {
     constructor() {
@@ -25,6 +25,7 @@ class SpaceInvaders {
         this.setupLighting();
         this.setupGame();
         this.setupDebugMode();
+        this.setupLightControls()
         this.setupEventListeners();
         if (sessionStorage.getItem('autoStart') === '1') {
             sessionStorage.removeItem('autoStart');
@@ -42,7 +43,20 @@ class SpaceInvaders {
             antialias: true
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.setClearColor(0x000000);
+            // Ground plane for shadows
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -10;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    // Add your glass plane here:
+    this.glassPlane = new GlassPlane(this.scene, 100, -10, -10.01);
 
         // Create starfield
         this.createStarfield();
@@ -158,23 +172,28 @@ createSun() {
   });
 
   /* ───── esfera do sol ───── */
-  const sun = new THREE.Mesh(new THREE.SphereGeometry(2, 64, 64), sunMaterial);
-  sun.position.set(-10, 20, 10);
-  this.scene.add(sun);
+     const sun = new THREE.Mesh(new THREE.SphereGeometry(2, 64, 64), sunMaterial);
+    sun.position.set(-10, 20, 10);
+    sun.castShadow = true;
+    sun.receiveShadow = true;
+    sun.name = "sun";
 
-  /* ───── luz direcional ───── */
-  const sunlight = new THREE.DirectionalLight(0xffddaa, 2);
-  sunlight.position.copy(sun.position);
-  sunlight.target.position.set(0, 0, 0);
-  this.scene.add(sunlight.target);
-  this.scene.add(sunlight);
+    this.scene.add(sun);
 
-  /* (opcional) helper */
-  // const helper = new THREE.DirectionalLightHelper(sunlight, 5);
-  // this.scene.add(helper);
+    // FIRST declare the sunlight variable
+    const sunlight = new THREE.DirectionalLight(0xffddaa, 2);
 
-  /* guardar referências p/ animação */
-  this._sunUniforms = uniforms;
+    // THEN set its position
+    sunlight.position.copy(sun.position);
+    sunlight.castShadow = true;
+    sunlight.shadow.mapSize.set(2048, 2048);
+    sunlight.shadow.camera.near = 0.5;
+    sunlight.shadow.camera.far = 100;
+    sunlight.name = "sunlight";
+
+    this.scene.add(sunlight);
+
+    this._sunUniforms = uniforms;
 }
 
 updateSun(delta) {
@@ -188,20 +207,37 @@ updateSun(delta) {
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 5, 5);
+        directionalLight.castShadow = true;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 100;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+
         this.scene.add(directionalLight);
+        ambientLight.name = "ambient";
+        directionalLight.name = "directional";
 
-        // Add point lights for dramatic effect
-        const pointLight1 = new THREE.PointLight(0xff0000, 0.5, 50);
-        pointLight1.position.set(-20, 15, 10);
-        this.scene.add(pointLight1);
-
-        const pointLight2 = new THREE.PointLight(0x00ff00, 0.5, 50);
-        pointLight2.position.set(20, 15, 10);
-        this.scene.add(pointLight2);
-        
+    this.createMoon();    
     this.createSun();
     }
+    createMoon() {
+    const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
+    const moonMaterial = new THREE.MeshStandardMaterial({
+        color: 0xaaaaaa,
+        metalness: 0.1,
+        roughness: 0.9
+    });
 
+    this.moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    this.moon.castShadow = true;
+    this.moon.receiveShadow = true;
+
+    this.moonOrbitRadius = 7;   // radius of orbit around the sun
+    this.moonOrbitSpeed = 0.5;  // speed of orbit
+    this.moonOrbitAngle = 0;
+
+    this.scene.add(this.moon);
+}
     setupGame() {
         this.gameStarted = false;
         this.player = new Player(this.scene);
@@ -863,6 +899,20 @@ updateSun(delta) {
     }
 
     update() {
+         if (!this.gameStarted) return;
+
+
+    // Update moon position around the sun
+         if (this.moon && this.scene.getObjectByName("sun")) {
+        const sunPosition = this.scene.getObjectByName("sun").position;
+
+        this.moonOrbitAngle += this.moonOrbitSpeed * 0.01;
+        this.moon.position.set(
+            sunPosition.x + this.moonOrbitRadius * Math.cos(this.moonOrbitAngle),
+            sunPosition.y,
+            sunPosition.z + this.moonOrbitRadius * Math.sin(this.moonOrbitAngle)
+        );
+    }
         // Se estamos no ecrã de escolha, só roda as naves
         if (this.shipSelectionActive) {
             // Enquanto ninguém escolheu, todas giram sobre si próprias
@@ -1394,6 +1444,60 @@ updateSun(delta) {
         pauseEl.style.display = show ? 'flex' : 'none';
         this.gameStarted = !show;          // pára ou retoma o ciclo de update()
 }
+toggleLight(lightName) {
+    const light = this.scene.getObjectByName(lightName);
+    if (light) {
+      light.visible = !light.visible;
+      console.log(`${lightName} light is now ${light.visible ? "on" : "off"}`);
+    } else {
+      console.error(`Light with name ${lightName} not found.`);
+    }
+  }
+
+  setupLightControls() {
+    const lights = [
+      { name: "sunlight", label: "Toggle Sun" },
+      { name: "ambient", label: "Toggle Ambient" },
+      { name: "directional", label: "Toggle Directional" },
+    ];
+
+    const container = document.createElement("div");
+    container.style.position = "absolute";
+    container.style.top = "10px";
+    container.style.right = "10px";
+    container.style.background = "rgba(0, 0, 0, 0.6)";
+    container.style.padding = "10px";
+    container.style.borderRadius = "5px";
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.gap = "5px";
+    container.style.color = "white";
+    container.style.zIndex = 100;
+
+    document.body.appendChild(container);
+
+    lights.forEach(({ name, label }) => {
+      const button = document.createElement("button");
+      const light = this.scene.getObjectByName(name);
+      button.textContent = `${label}: ${light && light.visible ? 'ON' : 'OFF'}`;
+      button.style.padding = "6px";
+      button.style.fontSize = "12px";
+      button.style.cursor = "pointer";
+
+      button.addEventListener("click", () => {
+        const light = this.scene.getObjectByName(name);
+        if (light) {
+          light.visible = !light.visible;
+          button.textContent = `${label}: ${light.visible ? "ON" : "OFF"}`;
+          console.log(`${name} light is now ${light.visible ? "ON" : "OFF"}`);
+        } else {
+          console.warn(`Light "${name}" not found in the scene.`);
+        }
+      });
+
+      container.appendChild(button);
+    });
+  }
 
 }
 

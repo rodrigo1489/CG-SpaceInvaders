@@ -122,6 +122,12 @@ export class MotherShip {
 
     this.model = ship;
     this.scene.add(this.model);
+    this.model.traverse((child) => {
+    if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+    }
+});
   }
 
   /* ────────── update/anim ────────── */

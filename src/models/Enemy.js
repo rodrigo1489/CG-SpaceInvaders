@@ -150,6 +150,12 @@ export class Enemy {
     this.scene.add(this.model);
     this.model.rotation.x = Math.PI / 2;
     this.beam.rotation.x  = -Math.PI / 2;
+    this.model.traverse((child) => {
+    if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+    }
+});
   }
 
   /* ─────────── disparo ─────────── */

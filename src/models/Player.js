@@ -194,6 +194,12 @@ export class Player {
 
     this.model = group;
     this.scene.add(this.model);
+    this.model.traverse((child) => {
+    if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+    }
+});
   }
 
   /* ─────────── movimento lateral ─────────── */

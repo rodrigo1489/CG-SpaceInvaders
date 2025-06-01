@@ -126,6 +126,12 @@ export class Boss extends Enemy {
         this.model.rotation.x = Math.PI * 0.1;
         
         this.scene.add(this.model);
+        this.model.traverse((child) => {
+    if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+    }
+});
     }
     
     getBossColor() {
