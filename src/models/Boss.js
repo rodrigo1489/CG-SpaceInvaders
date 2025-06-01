@@ -1,367 +1,373 @@
+// src/models/Boss.js
 import * as THREE from '/node_modules/three/build/three.module.js';
 import { Enemy } from './Enemy.js';
 import { VoxelModel } from '../utils/VoxelModel.js';
 import { COLORS } from '../utils/constants.js';
 
 export class Boss extends Enemy {
-    constructor(scene, bossLevel) {
-        super(scene, 0, 0); // Call parent constructor
-        
-        // Boss properties
-        this.bossLevel = bossLevel; // 1-4 (levels 5, 10, 15, 20)
-        this.isBoss = true;
-        this.health = 10 * bossLevel; // Health scales with level
-        this.pointValue = 1000 * bossLevel; // More points for higher level bosses
-        this.specialAttackTimer = 0;
-        this.lastSpecialAttack = 0;
-        this.specialAttackCooldown = 5000; // 5 seconds between special attacks
-        
-        // Override model with boss-specific model
-        this.model.remove(...this.model.children); // Remove default model
-        this.createBossModel();
-        
-        // Boss hitbox
-        this.hitboxRadius = 3 + bossLevel * 0.5;
-        
-        // Configure boss behavior based on level
-        this.configureBoss();
+  constructor(scene, bossLevel, renderer = null) {
+    super(scene, 0, 0); // Inicializa como Enemy “genérico”, mas logo sobrepomos o modelo
+
+    this.bossLevel = bossLevel;                // nível (1→4)
+    this.isBoss = true;
+    this.health = 10 * bossLevel;              // vida aumenta com o nível
+    this.pointValue = 1000 * bossLevel;        // pontos
+    this.specialAttackTimer = 0;
+    this.lastSpecialAttack = 0;
+    this.specialAttackCooldown = 5000;         // 5s entre ataques especiais
+
+    // Remove o modelo padrão de Enemy (provavelmente um cubinho)
+    this.model.traverse(child => {
+      if (child.isMesh) child.geometry.dispose();
+    });
+    this.model.clear();
+
+    // Cria novo modelo “porreiro” e texturizado
+    this.createBossModel(renderer);
+
+    // Ajusta hitbox de acordo com o novo tamanho
+    this.hitboxRadius = 3 + bossLevel * 0.5;
+
+    // Configura comportamento (movimento, tiros) baseado no nível
+    this.configureBoss();
+  }
+
+  createBossModel(renderer) {
+    const loader = new THREE.TextureLoader();
+
+    // Carrega texturas específicas para cada nível (coloque em /src/textures/)
+    const diffuseMap = loader.load(`/src/textures/boss${this.bossLevel}_diffuse.png`);
+    const normalMap  = loader.load(`/src/textures/boss${this.bossLevel}_normal.png`);
+    const emissiveMap= loader.load(`/src/textures/boss${this.bossLevel}_emissive.png`);
+
+    // Ajusta anisotropy se tiver renderer
+    if (renderer && renderer.capabilities.getMaxAnisotropy) {
+      const maxAniso = renderer.capabilities.getMaxAnisotropy();
+      [diffuseMap, normalMap, emissiveMap].forEach(tex => {
+        if (tex) tex.anisotropy = maxAniso;
+      });
     }
-    
-    createBossModel() {
-        const model = new VoxelModel();
-        
-        // Boss design - larger and more complex than regular enemies
-        const baseLayer = [
-            [0,0,1,1,1,1,1,0,0],
-            [0,1,1,1,1,1,1,1,0],
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1],
-            [0,1,1,1,1,1,1,1,0],
-            [0,0,1,1,1,1,1,0,0]
-        ];
-        
-        const middleLayer = [
-            [0,0,0,1,1,1,0,0,0],
-            [0,0,1,1,1,1,1,0,0],
-            [0,1,1,1,1,1,1,1,0],
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1],
-            [0,1,1,1,1,1,1,1,0],
-            [0,0,1,1,1,1,1,0,0],
-            [0,0,0,1,1,1,0,0,0]
-        ];
-        
-        const topLayer = [
-            [0,0,0,1,1,1,0,0,0],
-            [0,0,1,0,1,0,1,0,0],
-            [0,0,1,1,1,1,1,0,0],
-            [0,0,0,1,1,1,0,0,0]
-        ];
-        
-        // Use different colors based on boss level
-        const baseColor = this.getBossColor();
-        const accentColor = this.getBossAccentColor();
-        
-        // Build the boss from bottom to top
-        model.addLayer(baseLayer, 0, baseColor);
-        model.addLayer(middleLayer, 1, baseColor);
-        model.addLayer(topLayer, 2, accentColor);
-        
-        // Add special details for higher level bosses
-        if (this.bossLevel >= 2) {
-            const weaponLayer = [
-                [1,0,0,0,0,0,0,0,1],
-                [0,0,0,0,0,0,0,0,0],
-                [1,0,0,0,0,0,0,0,1]
-            ];
-            model.addLayer(weaponLayer, 1.5, accentColor);
-        }
-        
-        if (this.bossLevel >= 3) {
-            // Add wing structures for level 3+ bosses
-            const wingGeometry = new THREE.BoxGeometry(2, 0.5, 0.5);
-            const wingMaterial = new THREE.MeshStandardMaterial({ 
-                color: accentColor,
-                metalness: 0.8,
-                roughness: 0.2
-            });
-            
-            const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
-            leftWing.position.set(-5, 0, 0);
-            
-            const rightWing = new THREE.Mesh(wingGeometry, wingMaterial);
-            rightWing.position.set(5, 0, 0);
-            
-            model.getModel().add(leftWing);
-            model.getModel().add(rightWing);
-        }
-        
-        if (this.bossLevel >= 4) {
-            // Add more details for final boss
-            const crownGeometry = new THREE.BoxGeometry(3, 1, 0.5);
-            const crownMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xffaa00,
-                metalness: 0.8,
-                roughness: 0.2
-            });
-            
-            const crown = new THREE.Mesh(crownGeometry, crownMaterial);
-            crown.position.set(0, 3, 0);
-            
-            model.getModel().add(crown);
-        }
-        
-        this.model = model.getModel();
-        
-        // Scale boss size based on level
-        const scale = 1.5 + (this.bossLevel * 0.5);
-        this.model.scale.set(scale, scale, scale);
-        
-        // Position boss at top of screen
-        this.model.position.set(0, 15, 0);
-        
-        // Rotate to face down
-        this.model.rotation.x = Math.PI * 0.1;
-        
-        this.scene.add(this.model);
-        this.model.traverse((child) => {
-    if (child.isMesh) {
+
+    // Grupo principal do boss
+    const bossGroup = new THREE.Group();
+
+    // ─── 1. Corpo principal em voxel, mas com material texturizado ───
+    const model = new VoxelModel();
+
+    // Camadas base, middle e top (mesmas de antes)
+    const baseLayer = [
+      [0,0,1,1,1,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,0,0]
+    ];
+    const middleLayer = [
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,0,0,0]
+    ];
+    const topLayer = [
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,1,0,1,0,1,0,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,0,0,0]
+    ];
+
+    // Cria material texturizado para os voxels principais
+    const voxelMaterial = new THREE.MeshStandardMaterial({
+      map:       diffuseMap,
+      normalMap: normalMap,
+      emissiveMap: emissiveMap,
+      emissiveIntensity: 0.4,
+      metalness: 0.6,
+      roughness: 0.5,
+      color:     0xffffff
+    });
+
+    // Temporariamente substituímos COLORS.BARRIER pela textura do nível atual
+    model._tempMaterial = voxelMaterial; 
+    // (adaptar addVoxel para usar model._tempMaterial em vez de criar MeshStandardMaterial genérico)
+    model.addLayer(baseLayer, 0, COLORS.BARRIER);
+    model.addLayer(middleLayer, 1, COLORS.BARRIER);
+    model.addLayer(topLayer, 2, COLORS.BARRIER);
+
+    const voxelMesh = model.getModel();
+    bossGroup.add(voxelMesh);
+
+    // ─── 2. Detalhes “metálicos” adicionais (wings, armaduras) ───
+    if (this.bossLevel >= 2) {
+      const wingGeo = new THREE.BoxGeometry(2.5, 0.4, 0.4);
+      const wingMat = new THREE.MeshPhysicalMaterial({
+        color:     0x333333,
+        metalness: 0.9,
+        roughness: 0.2,
+        clearcoat: 0.3
+      });
+
+      const leftWing = new THREE.Mesh(wingGeo, wingMat);
+      leftWing.position.set(-6, 0, 0);
+      leftWing.castShadow = true;
+      leftWing.receiveShadow = true;
+      bossGroup.add(leftWing);
+
+      const rightWing = leftWing.clone();
+      rightWing.position.set(6, 0, 0);
+      bossGroup.add(rightWing);
+    }
+
+    if (this.bossLevel >= 3) {
+      const antennaGeo = new THREE.CylinderGeometry(0.1, 0.1, 3, 12);
+      const antennaMat = new THREE.MeshStandardMaterial({
+        color: 0xaaaaaa,
+        metalness: 0.7,
+        roughness: 0.3
+      });
+      const antennaLeft = new THREE.Mesh(antennaGeo, antennaMat);
+      antennaLeft.position.set(-2, 4, 0);
+      antennaLeft.rotation.z = Math.PI / 8;
+      antennaLeft.castShadow = true;
+      antennaLeft.receiveShadow = true;
+      bossGroup.add(antennaLeft);
+
+      const antennaRight = antennaLeft.clone();
+      antennaRight.position.set(2, 4, 0);
+      antennaRight.rotation.z = -Math.PI / 8;
+      bossGroup.add(antennaRight);
+    }
+
+    if (this.bossLevel >= 4) {
+      // Coroa metálica no topo
+      const crownGeo = new THREE.TorusGeometry(3.5, 0.3, 8, 64);
+      const crownMat = new THREE.MeshPhysicalMaterial({
+        color:      0xffdd00,
+        metalness:  1.0,
+        roughness:  0.2,
+        clearcoat:  0.5,
+        clearcoatRoughness: 0.1
+      });
+      const crown = new THREE.Mesh(crownGeo, crownMat);
+      crown.position.set(0, 4.5, 0);
+      crown.rotation.x = Math.PI / 2;
+      crown.castShadow = true;
+      crown.receiveShadow = true;
+      bossGroup.add(crown);
+    }
+
+    // ─── 3. Ajustes finais: escala, posição, rotação ───
+    const scale = 1.5 + this.bossLevel * 0.5;
+    bossGroup.scale.set(scale, scale, scale);
+
+    // Posição inicial: “aparece” acima da tela
+    bossGroup.position.set(0, 15, 0);
+    bossGroup.rotation.x = Math.PI * 0.1;
+    this.scene.add(bossGroup);
+
+    bossGroup.traverse(child => {
+      if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+      }
+    });
+
+    this.model = bossGroup;
+  }
+
+  getBossColor() {
+    switch (this.bossLevel) {
+      case 1: return 0xff3333;   // Vermelho-escuro
+      case 2: return 0xff00ff;   // Magenta
+      case 3: return 0x3333ff;   // Azul-escuro
+      case 4: return 0xffaa00;   // Laranja-amarelo
+      default: return 0xffffff;
     }
-});
+  }
+
+  getBossAccentColor() {
+    switch (this.bossLevel) {
+      case 1: return 0xffff66;   // Amarelo-claro
+      case 2: return 0x66ffff;   // Ciano-claro
+      case 3: return 0xff66ff;   // Rosa-claro
+      case 4: return 0xffffff;   // Branco
+      default: return 0xffffff;
     }
-    
-    getBossColor() {
-        // Different colors for each boss level
-        switch(this.bossLevel) {
-            case 1: return 0xff0000; // Red (level 5)
-            case 2: return 0xff00ff; // Magenta (level 10)
-            case 3: return 0x0000ff; // Blue (level 15)
-            case 4: return 0xffaa00; // Orange-gold (level 20)
-            default: return 0xff0000;
-        }
+  }
+
+  configureBoss() {
+    // Ajusta movimento, intervalo de tiro e outros
+    switch (this.bossLevel) {
+      case 1: 
+        this.amplitude = 0.1;
+        this.frequency = 0.4;
+        this.shootingInterval = 2000;
+        this.multiShot = 1;
+        break;
+      case 2:
+        this.amplitude = 0.15;
+        this.frequency = 0.7;
+        this.shootingInterval = 1500;
+        this.multiShot = 2;
+        break;
+      case 3:
+        this.amplitude = 0.2;
+        this.frequency = 1.0;
+        this.shootingInterval = 1000;
+        this.multiShot = 3;
+        break;
+      case 4:
+        this.amplitude = 0.25;
+        this.frequency = 1.2;
+        this.shootingInterval = 800;
+        this.multiShot = 4;
+        this.specialAttack = true;
+        break;
+      default:
+        this.amplitude = 0.1;
+        this.frequency = 0.5;
+        this.shootingInterval = 2000;
+        this.multiShot = 1;
     }
-    
-    getBossAccentColor() {
-        // Accent colors for each boss level
-        switch(this.bossLevel) {
-            case 1: return 0xffff00; // Yellow (level 5)
-            case 2: return 0x00ffff; // Cyan (level 10)
-            case 3: return 0xff00ff; // Magenta (level 15)
-            case 4: return 0xffffff; // White (level 20)
-            default: return 0xffff00;
-        }
+    this.lastShot = Date.now();
+  }
+
+  move(time) {
+    // Movimento horizontal oscilante
+    this.model.position.x = Math.sin(time * this.frequency) * (10 * this.amplitude);
+
+    // Boss de nível ≥2 “flutua” verticalmente
+    if (this.bossLevel >= 2) {
+      this.model.position.y = 15 + Math.sin(time * this.frequency * 0.5) * 2;
     }
-    
-    configureBoss() {
-        // Configure boss behavior based on level
-        switch(this.bossLevel) {
-            case 1: // Level 5 boss - Side-to-side movement
-                this.amplitude = 0.1;
-                this.frequency = 0.5;
-                this.shootingInterval = 2000;
-                break;
-                
-            case 2: // Level 10 boss - Faster movement, rapid fire
-                this.amplitude = 0.15;
-                this.frequency = 0.8;
-                this.shootingInterval = 1500;
-                this.multiShot = 2; // Can fire 2 bullets at once
-                break;
-                
-            case 3: // Level 15 boss - Complex movement, very rapid fire
-                this.amplitude = 0.2;
-                this.frequency = 1;
-                this.shootingInterval = 1000;
-                this.multiShot = 3; // Can fire 3 bullets at once
-                break;
-                
-            case 4: // Level 20 boss - Final boss, ultimate challenge
-                this.amplitude = 0.25;
-                this.frequency = 1.2;
-                this.shootingInterval = 800;
-                this.multiShot = 4; // Can fire 4 bullets at once
-                this.specialAttack = true; // Can use special attacks
-                break;
-        }
+
+    // Ataque especial (se habilitado)
+    if (this.specialAttack && Date.now() - this.lastSpecialAttack > this.specialAttackCooldown) {
+      this.specialAttackTimer++;
+      if (this.specialAttackTimer >= 300) {
+        this.performSpecialAttack();
+        this.specialAttackTimer = 0;
+        this.lastSpecialAttack = Date.now();
+      }
     }
-    
-    move(time) {
-        // Complex movement pattern for bosses
-        this.model.position.x = Math.sin(time * this.frequency) * (10 * this.amplitude);
-        
-        // Slight vertical movement for higher level bosses
-        if (this.bossLevel >= 2) {
-            this.model.position.y = 15 + Math.sin(time * this.frequency * 0.5) * 2;
-        }
-        
-        // Check if it's time for a special attack
-        if (this.specialAttack && Date.now() - this.lastSpecialAttack > this.specialAttackCooldown) {
-            this.specialAttackTimer++;
-            
-            // Do special attack every 300 frames (about 5 seconds)
-            if (this.specialAttackTimer >= 300) {
-                this.performSpecialAttack();
-                this.specialAttackTimer = 0;
-                this.lastSpecialAttack = Date.now();
-            }
-        }
+  }
+
+  shoot() {
+    const now = Date.now();
+    if (now - this.lastShot < this.shootingInterval) return null;
+
+    const bullets = [];
+    const count = this.multiShot || 1;
+
+    for (let i = 0; i < count; i++) {
+      const spread = (i - (count - 1) / 2) * 1.0;
+      const geo = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+      const mat = new THREE.MeshStandardMaterial({
+        color: this.getBossAccentColor(),
+        metalness: 1.0,
+        roughness: 0.2
+      });
+      const bullet = new THREE.Mesh(geo, mat);
+
+      bullet.position.copy(this.model.position);
+      bullet.position.y -= 2;
+      bullet.position.x += spread;
+      bullet.userData = { isBossBullet: true, bossLevel: this.bossLevel };
+
+      this.scene.add(bullet);
+      bullets.push(bullet);
     }
-    
-    shoot() {
-        const now = Date.now();
-        if (now - this.lastShot < this.shootingInterval) return null;
-        
-        // Create bullets based on multiShot setting
-        const bullets = [];
-        const bulletCount = this.multiShot || 1;
-        
-        for (let i = 0; i < bulletCount; i++) {
-            const bulletSpread = (i - (bulletCount - 1) / 2) * 0.8; // Spread bullets horizontally
-            
-            // Create bullet with metallic material
-            const bulletGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
-            const bulletMaterial = new THREE.MeshStandardMaterial({ 
-                color: this.getBossAccentColor(),
-                metalness: 0.8,
-                roughness: 0.2
-            });
-            
-            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-            
-            // Position bullet at boss position with spread
-            bullet.position.copy(this.model.position);
-            bullet.position.y -= 2;  // Adjust for boss size
-            bullet.position.x += bulletSpread;
-            
-            // Mark this as a boss bullet for special effects
-            bullet.userData = { isBossBullet: true, bossLevel: this.bossLevel };
-            
-            this.scene.add(bullet);
-            bullets.push(bullet);
-        }
-        
-        this.lastShot = now;
-        
-        // Return array of bullets or null
-        return bullets.length ? bullets : null;
+
+    this.lastShot = now;
+    return bullets.length ? bullets : null;
+  }
+
+  performSpecialAttack() {
+    if (this.bossLevel === 4) {
+      this.createCircularBulletPattern();
+    } else {
+      this.createLaserBeam();
     }
-    
-    performSpecialAttack() {
-        // Create a special attack effect based on boss level
-        const specialAttackType = this.bossLevel;
-        
-        switch(specialAttackType) {
-            case 4: // Final boss special attack - create circular bullet pattern
-                this.createCircularBulletPattern();
-                break;
-            
-            default: // Default special attack for other boss levels
-                this.createLaserBeam();
-                break;
-        }
+  }
+
+  createCircularBulletPattern() {
+    const bullets = [];
+    const count = 12;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xff0000,
+        metalness: 1.0,
+        roughness: 0.2
+      });
+      const b = new THREE.Mesh(geo, mat);
+
+      b.position.copy(this.model.position);
+      b.position.x += Math.cos(angle) * 3;
+      b.position.y += Math.sin(angle) * 3 - 2;
+      b.userData = {
+        isSpecialAttack: true,
+        angle: angle,
+        speed: 0.3,
+        radius: 3
+      };
+
+      this.scene.add(b);
+      bullets.push(b);
     }
-    
-    createCircularBulletPattern() {
-        // Create a circular pattern of bullets around the boss
-        const bulletCount = 12;
-        const bullets = [];
-        
-        for (let i = 0; i < bulletCount; i++) {
-            const angle = (i / bulletCount) * Math.PI * 2;
-            
-            // Create bullet with metallic material
-            const bulletGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-            const bulletMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xff0000,
-                metalness: 0.8,
-                roughness: 0.2
-            });
-            
-            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-            
-            // Position bullet in a circle around the boss
-            bullet.position.copy(this.model.position);
-            bullet.position.x += Math.cos(angle) * 3;
-            bullet.position.y += Math.sin(angle) * 3 - 2;
-            
-            // Set special properties on bullet for circular pattern movement
-            bullet.userData = { 
-                isSpecialAttack: true, 
-                angle: angle,
-                speed: 0.2,
-                radius: 3
-            };
-            
-            this.scene.add(bullet);
-            bullets.push(bullet);
-        }
-        
-        return bullets;
-    }
-    
-    createLaserBeam() {
-        // Create a laser beam effect with metallic material
-        const laserGeometry = new THREE.BoxGeometry(0.5, 20, 0.5);
-        const laserMaterial = new THREE.MeshStandardMaterial({ 
-            color: this.getBossAccentColor(),
-            transparent: true,
-            opacity: 0.7,
-            metalness: 0.8,
-            roughness: 0.2
-        });
-        
-        const laser = new THREE.Mesh(laserGeometry, laserMaterial);
-        
-        // Position laser at boss position
-        laser.position.copy(this.model.position);
-        laser.position.y -= 10;  // Center the laser beam
-        
-        // Mark this as a special attack
-        laser.userData = { 
-            isSpecialAttack: true,
-            damage: this.bossLevel,
-            duration: 60 // Frames to live
-        };
-        
-        this.scene.add(laser);
-        return laser;
-    }
-    
-    takeDamage(amount = 1) {
-        // Flash the boss when hit
-        this.flashOnHit();
-        
-        // Boss takes damage like normal enemy
-        return super.takeDamage(amount);
-    }
-    
-    flashOnHit() {
-        // Flash effect when boss takes damage
-        const originalMaterials = [];
-        
-        // Store original materials
-        this.model.traverse((child) => {
-            if (child.isMesh) {
-                originalMaterials.push({
-                    mesh: child,
-                    material: child.material.clone()
-                });
-                
-                // Change to flash material
-                child.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            }
-        });
-        
-        // Restore original materials after a short delay
-        setTimeout(() => {
-            originalMaterials.forEach(({mesh, material}) => {
-                mesh.material.dispose();
-                mesh.material = material;
-            });
-        }, 100);
-    }
-} 
+
+    return bullets;
+  }
+
+  createLaserBeam() {
+    const geo = new THREE.BoxGeometry(0.5, 20, 0.5);
+    const mat = new THREE.MeshStandardMaterial({
+      color: this.getBossAccentColor(),
+      transparent: true,
+      opacity: 0.7,
+      metalness: 1.0,
+      roughness: 0.2
+    });
+    const laser = new THREE.Mesh(geo, mat);
+
+    laser.position.copy(this.model.position);
+    laser.position.y -= 10;
+    laser.userData = {
+      isSpecialAttack: true,
+      damage: this.bossLevel,
+      duration: 60
+    };
+
+    this.scene.add(laser);
+    return laser;
+  }
+
+  takeDamage(amount = 1) {
+    this.flashOnHit();
+    return super.takeDamage(amount);
+  }
+
+  flashOnHit() {
+    const originals = [];
+    this.model.traverse(child => {
+      if (child.isMesh) {
+        originals.push({ mesh: child, material: child.material.clone() });
+        child.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      }
+    });
+    setTimeout(() => {
+      originals.forEach(o => {
+        o.mesh.material.dispose();
+        o.mesh.material = o.material;
+      });
+    }, 100);
+  }
+}

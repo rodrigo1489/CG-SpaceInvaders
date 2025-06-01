@@ -29,36 +29,36 @@ class SpaceInvaders {
 
     // Clonar elementos HTML que são frequentemente usados
     this.el = {
-      hud:           document.getElementById('hud'),
-      score:         document.getElementById('score'),
-      lives:         document.getElementById('lives'),
-      level:         document.getElementById('level'),
-      highScore:     document.getElementById('high-score'),
-      highestLevel:  document.getElementById('highest-level'),
-      menu:          document.getElementById('menu'),
-      shipSelection: document.getElementById('ship-selection'),
-      confirmShip:   document.getElementById('confirm-ship'),
-      startButton:   document.getElementById('start-button'),
-      nextLevelBtn:  document.getElementById('next-level-button'),
-      restartBtn:    document.getElementById('restart-button'),
-      resumeBtn:     document.getElementById('resume-button'),
-      mainMenuBtn:   document.getElementById('main-menu-button'),
-      restartPause:  document.getElementById('restart-button-pause'),
-      gameMode:      document.getElementById('game-mode'),
-      pauseMenu:     document.getElementById('pause-menu'),
-      levelComplete: document.getElementById('level-complete'),
-      gameOver:      document.getElementById('game-over'),
-      finalScore:    document.getElementById('final-score'),
+      hud:             document.getElementById('hud'),
+      score:           document.getElementById('score'),
+      lives:           document.getElementById('lives'),
+      level:           document.getElementById('level'),
+      highScore:       document.getElementById('high-score'),
+      highestLevel:    document.getElementById('highest-level'),
+      menu:            document.getElementById('menu'),
+      shipSelection:   document.getElementById('ship-selection'),
+      confirmShip:     document.getElementById('confirm-ship'),
+      startButton:     document.getElementById('start-button'),
+      nextLevelBtn:    document.getElementById('next-level-button'),
+      restartBtn:      document.getElementById('restart-button'),
+      resumeBtn:       document.getElementById('resume-button'),
+      mainMenuBtn:     document.getElementById('main-menu-button'),
+      restartPause:    document.getElementById('restart-button-pause'),
+      gameMode:        document.getElementById('game-mode'),
+      pauseMenu:       document.getElementById('pause-menu'),
+      levelComplete:   document.getElementById('level-complete'),
+      gameOver:        document.getElementById('game-over'),
+      finalScore:      document.getElementById('final-score'),
       levelsCompleted: document.getElementById('levels-completed'),
-      victoryScreen: document.getElementById('victory-screen'),
-      levelScore:    document.getElementById('level-score'),
-      currentLevel:  document.getElementById('current-level'),
-      debugPanel:    document.getElementById('debug-panel'),
-      debugInfo:     document.getElementById('debug-info'),
-      debugModeChk:  document.getElementById('debug-mode'),
+      victoryScreen:   document.getElementById('victory-screen'),
+      levelScore:      document.getElementById('level-score'),
+      currentLevel:    document.getElementById('current-level'),
+      debugPanel:      document.getElementById('debug-panel'),
+      debugInfo:       document.getElementById('debug-info'),
+      debugModeChk:    document.getElementById('debug-mode'),
       debugInvincible: document.getElementById('debug-invincible'),
       debugClearEnemies: document.getElementById('debug-clear-enemies'),
-      debugNextLevel: document.getElementById('debug-next-level')
+      debugNextLevel:    document.getElementById('debug-next-level')
     };
 
     this._cacheDOM();
@@ -75,24 +75,43 @@ class SpaceInvaders {
 
   // Cacheia referências a elementos HTML para evitar múltiplos getElementById
   _cacheDOM() {
-    // Se algum elemento não existir, assegura que se mantém null para não quebrar
     for (const key in this.el) {
       if (!this.el[key]) this.el[key] = null;
     }
   }
 
-  // Inicialização da cena, câmara, renderer, chão e starfield
+  // Inicialização da cena, câmaras (persp e orto), renderer, chão e starfield
   _initThree() {
-    this.scene    = new THREE.Scene();
-    this.camera   = new THREE.PerspectiveCamera(
+    this.scene = new THREE.Scene();
+
+    // --- 1) Câmara Perspectiva (3D) ---
+    const aspect = window.innerWidth / window.innerHeight;
+    this.perspCamera = new THREE.PerspectiveCamera(
       75,
-      window.innerWidth / window.innerHeight,
+      aspect,
       0.1,
       1000
     );
+    this.perspCamera.position.set(0, -12, 15);
+    this.perspCamera.lookAt(0, 5, 0);
+
+    // --- 2) Câmara Ortográfica (2D) ---
+    const frustumSize = 40;
+    const halfH = frustumSize / 2;
+    const halfW = halfH * aspect;
+    this.orthoCamera = new THREE.OrthographicCamera(
+      -halfW, halfW, halfH, -halfH, 0.1, 1000
+    );
+    this.orthoCamera.position.set(0, 0, 30);
+    this.orthoCamera.lookAt(0, 0, 0);
+
+    // Começamos usando a câmera em perspectiva
+    this.activeCamera = this.perspCamera;
+
+    // Renderer
     this.renderer = new THREE.WebGLRenderer({
-      canvas:      document.getElementById('game-canvas'),
-      antialias:   true
+      canvas:    document.getElementById('game-canvas'),
+      antialias: true
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
@@ -104,8 +123,8 @@ class SpaceInvaders {
       new THREE.PlaneGeometry(100, 100),
       new THREE.ShadowMaterial({ opacity: 0.4 })
     );
-    ground.rotation.x   = -Math.PI / 2;
-    ground.position.y   = -10;
+    ground.rotation.x    = -Math.PI / 2;
+    ground.position.y    = -10;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
@@ -114,10 +133,6 @@ class SpaceInvaders {
 
     // Host starfield + nebulosas
     this._createStarfield();
-
-    // Posição inicial da câmara
-    this.camera.position.set(0, -12, 15);
-    this.camera.lookAt(0, 5, 0);
   }
 
   // Cria partículas de estrela e sprites de nebulosa
@@ -393,14 +408,22 @@ class SpaceInvaders {
   _updateDebugInfo() {
     if (!this.debugMode) return;
 
-    // Atualiza cada hitbox
     this.debugObjects.forEach(o => {
       if (o.userData.entityRef && o.userData.entityRef.getPosition) {
         o.position.copy(o.userData.entityRef.getPosition());
       }
     });
 
-    // Calcula FPS em janela de 1 segundo
+    let pInfo = {
+      isInvulnerable: false,
+      shotsFired:      0,
+      timesHit:        0,
+      distanceMoved:   0
+    };
+    if (this.player && typeof this.player.getDebugInfo === 'function') {
+      pInfo = this.player.getDebugInfo();
+    }
+
     const now = performance.now();
     this.frames++;
     if (now - this.lastFpsUpdate > 1000) {
@@ -409,8 +432,6 @@ class SpaceInvaders {
       this.frames = 0;
     }
 
-    // Obtém info do player (invulnerável, shots fired, times hit, distance moved)
-    const pInfo = this.player.getDebugInfo();
     let txt = `FPS: ${this.fps}\n`;
     txt += `Game State: ${this.gameStarted ? 'RUNNING' : 'PAUSED'}\n`;
     txt += `Slow Motion: ${this.slowMotion ? 'ON' : 'OFF'}\n`;
@@ -423,22 +444,31 @@ class SpaceInvaders {
     txt += `Player Bullets: ${this.playerBullets.length}\n`;
     txt += `Enemy Bullets: ${this.enemyBullets.length}\n`;
     txt += '----------\n';
-    txt += `Player Position: ${this._formatVec(this.player.getPosition())}\n`;
+
+    if (this.player && typeof this.player.getPosition === 'function') {
+      const pp = this.player.getPosition();
+      txt += `Player Position: ${this._formatVec(pp)}\n`;
+    } else {
+      txt += `Player Position: (n/a)\n`;
+    }
+
     txt += `Player Invulnerable: ${pInfo.isInvulnerable ? 'YES' : 'NO'}\n`;
     txt += `Shots Fired: ${pInfo.shotsFired}\n`;
     txt += `Times Hit: ${pInfo.timesHit}\n`;
     txt += `Distance Moved: ${pInfo.distanceMoved}u\n`;
     txt += '----------\n';
-    txt += `Camera: ${this._formatVec(this.camera.position)}\n`;
+    txt += `Camera: ${this._formatVec(this.activeCamera.position)}\n`;
     txt += '\nKeyboard Shortcuts:\n';
-    txt += '` - Toggle debug mode\n';
-    txt += 'i - Toggle invincibility\n';
-    txt += 'c - Clear enemies\n';
-    txt += 'n - Next level\n';
-    txt += 'p - Pause/resume\n';
-    txt += 's - Slow motion\n';
+    txt += "` - Toggle debug mode\n";
+    txt += "i - Toggle invincibility\n";
+    txt += "c - Clear enemies\n";
+    txt += "n - Next level\n";
+    txt += "p - Pause/resume\n";
+    txt += "s - Slow motion\n";
 
-    if (this.el.debugInfo) this.el.debugInfo.textContent = txt;
+    if (this.el.debugInfo) {
+      this.el.debugInfo.textContent = txt;
+    }
   }
 
   // Formata vetores em texto com 2 casas decimais
@@ -490,9 +520,12 @@ class SpaceInvaders {
   // Regista todos os eventos de teclado, botões e resize
   _setupEventListeners() {
     this.keys = {};
+
+    // Teclado: keydown
     window.addEventListener('keydown', e => {
       this.keys[e.key] = true;
 
+      // Escape: abre/fecha menu de pausa
       if (e.key === 'Escape') {
         if (this.gameStarted) this.togglePauseMenu(true);
         else if (this.el.pauseMenu && this.el.pauseMenu.style.display === 'flex') {
@@ -500,17 +533,20 @@ class SpaceInvaders {
         }
       }
 
-      // Debug shortcuts (apenas se debugMode = true)
+      // Atalhos de debug (apenas se debugMode = true)
       if (this.debugMode) {
+        // Invencibilidade
         if (e.key === 'i') {
           this.player.isInvulnerable = !this.player.isInvulnerable;
           console.log(`Player invincibility: ${this.player.isInvulnerable ? 'ON' : 'OFF'}`);
         }
+        // Limpar inimigos
         if (e.key === 'c') {
           this.enemies.forEach(en => en.remove());
           this.enemies = [];
           console.log('Inimigos limpos');
         }
+        // Próximo nível
         if (e.key === 'n') {
           this.level++;
           this._updateHUD();
@@ -519,10 +555,12 @@ class SpaceInvaders {
           this._createDebugVisuals();
           console.log(`Próximo nível: ${this.level}`);
         }
+        // Pausar/resumir
         if (e.key === 'p') {
           this.gameStarted = !this.gameStarted;
           console.log(`Game ${this.gameStarted ? 'resumed' : 'paused'}`);
         }
+        // Slow motion
         if (e.key === 's') {
           if (!this.slowMotion) {
             GAME_CONFIG.BULLET_SPEED /= 2;
@@ -536,16 +574,49 @@ class SpaceInvaders {
         }
       }
 
-      // Alterna debug mode com `
-      if (e.key === '`' && this.el.debugModeChk) {
+      // Alterna debug mode com tecla ` (ou Backquote para compatibilidade)
+      if ((e.key === '`' || e.code === 'Backquote') && this.el.debugModeChk) {
         this.el.debugModeChk.checked = !this.el.debugModeChk.checked;
         this.toggleDebugMode(this.el.debugModeChk.checked);
       }
     });
-    window.addEventListener('keyup', e => { this.keys[e.key] = false; });
-    window.addEventListener('resize', () => this._handleResize());
 
-    // Botões do menu
+    // Teclado: keyup
+    window.addEventListener('keyup', e => {
+      this.keys[e.key] = false;
+    });
+
+    // Resize da janela: ajustar ambas câmaras
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const aspect = w / h;
+
+      // Perspectiva
+      this.perspCamera.aspect = aspect;
+      this.perspCamera.updateProjectionMatrix();
+
+      // Ortográfica
+      const frustumSize = 40;
+      const halfH = frustumSize / 2;
+      const halfW = halfH * aspect;
+      this.orthoCamera.left   = -halfW;
+      this.orthoCamera.right  =  halfW;
+      this.orthoCamera.top    =  halfH;
+      this.orthoCamera.bottom = -halfH;
+      this.orthoCamera.updateProjectionMatrix();
+
+      this.renderer.setSize(w, h);
+    });
+
+    // Listener para o checkbox de debug
+    if (this.el.debugModeChk) {
+      this.el.debugModeChk.addEventListener('change', e => {
+        this.toggleDebugMode(e.target.checked);
+      });
+    }
+
+    // Botão Start Game
     if (this.el.startButton) {
       this.el.startButton.addEventListener('click', () => {
         this.el.menu.style.display = 'none';
@@ -554,12 +625,16 @@ class SpaceInvaders {
         this._startShipSelection();
       });
     }
+
+    // Botão Confirmar Nave
     if (this.el.confirmShip) {
       this.el.confirmShip.addEventListener('click', () => {
         this.el.shipSelection.style.display = 'none';
         this._finaliseSelection();
       });
     }
+
+    // Botão Next Level (Level Complete)
     if (this.el.nextLevelBtn) {
       this.el.nextLevelBtn.addEventListener('click', () => {
         this.el.levelComplete.style.display = 'none';
@@ -569,34 +644,46 @@ class SpaceInvaders {
         this.gameStarted = true;
       });
     }
+
+    // Botão Restart (Game Over)
     if (this.el.restartBtn) {
       this.el.restartBtn.addEventListener('click', () => this._resetToLevel1());
     }
+
+    // Botão Resume (Pause Menu)
     if (this.el.resumeBtn) {
       this.el.resumeBtn.addEventListener('click', () => this.togglePauseMenu(false));
     }
+
+    // Botão Main Menu (Pause Menu)
     if (this.el.mainMenuBtn) {
       this.el.mainMenuBtn.addEventListener('click', () => location.reload());
     }
+
+    // Botão Restart dentro do Pause Menu
     if (this.el.restartPause) {
       this.el.restartPause.addEventListener('click', () => this._resetToLevel1());
     }
 
-    // Troca modo de câmara (action-cam vs 2D)
+    // Seleção de modo de câmera (Action Cam vs Classic)
     if (this.el.gameMode) {
       this.el.gameMode.addEventListener('change', e => {
         const pos = this.player.getPosition();
         if (e.target.value === 'action-cam') {
-          this.camera.position.set(pos.x * 0.8, -12, 15);
-          this.camera.lookAt(pos.x * 0.8, 5, 0);
+          // Perspectiva 3D
+          this.activeCamera = this.perspCamera;
+          this.perspCamera.position.set(pos.x * 0.8, -12, 15);
+          this.perspCamera.lookAt(pos.x * 0.8, 5, 0);
         } else {
-          this.camera.position.set(pos.x * 0.8, 0, 30);
-          this.camera.lookAt(pos.x * 0.8, 0, 0);
+          // Ortográfica 2D
+          this.activeCamera = this.orthoCamera;
+          this.orthoCamera.position.set(pos.x * 0.8, 0, 30);
+          this.orthoCamera.lookAt(pos.x * 0.8, 0, 0);
         }
       });
     }
 
-    // Botões debug (invincible, clear enemies, next level)
+    // Botões de debug no painel (invincible, clear enemies, next level)
     if (this.el.debugInvincible) {
       this.el.debugInvincible.addEventListener('click', () => {
         if (this.player) {
@@ -633,15 +720,6 @@ class SpaceInvaders {
     }
   }
 
-  // Redimensiona câmara/renderer
-  _handleResize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-  }
-
   // Inicia menu de seleção de nave (cria 4 instâncias Player giratórias)
   _startShipSelection() {
     this.shipSelectionActive = true;
@@ -670,7 +748,7 @@ class SpaceInvaders {
     if (!this.shipSelectionActive) return;
     this.mouse.x = (event.clientX / window.innerWidth)  * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+    this.raycaster.setFromCamera(this.mouse, this.activeCamera);
     const hits = this.raycaster.intersectObjects(this.availableShips, true);
     if (hits.length) this._chooseShip(hits[0].object);
   }
@@ -686,7 +764,7 @@ class SpaceInvaders {
 
     const target = new THREE.Vector3(ship.position.x, ship.position.y + 2, ship.position.z + 6);
     this.cameraLerp = {
-      start: this.camera.position.clone(),
+      start: this.activeCamera.position.clone(),
       end:   target,
       t:     0
     };
@@ -708,11 +786,13 @@ class SpaceInvaders {
 
     const mode = this.el.gameMode ? this.el.gameMode.value : 'action-cam';
     if (mode === 'action-cam') {
-      this.camera.position.set(0, -12, 15);
-      this.camera.lookAt(0, 5, 0);
+      this.activeCamera = this.perspCamera;
+      this.perspCamera.position.set(0, -12, 15);
+      this.perspCamera.lookAt(0, 5, 0);
     } else {
-      this.camera.position.set(0, 0, 30);
-      this.camera.lookAt(0, 0, 0);
+      this.activeCamera = this.orthoCamera;
+      this.orthoCamera.position.set(0, 0, 30);
+      this.orthoCamera.lookAt(0, 0, 0);
     }
 
     this.level = 1;
@@ -723,7 +803,6 @@ class SpaceInvaders {
 
   // Cria nível (verifica se é boss ou standard + cria barreiras)
   _createLevel() {
-    // Limpa inimigos, barreiras, balas antigas
     this.enemies.forEach(e => e.remove());
     this.barriers.forEach(b => b.remove());
     this.playerBullets.forEach(b => this.scene.remove(b));
@@ -755,8 +834,13 @@ class SpaceInvaders {
     const cols = Math.min(5 + Math.floor(this.level / 4), 8);
     const xSpacing = 5;
     const ySpacing = 4.5;
-    const xOffset  = -(cols * xSpacing) / 2 + xSpacing / 2;
-    const startY   = 15;
+
+    // Calcula dinamicamente para que a última linha não fique abaixo de y=0
+    const margemY = 2;
+    const Ytop = (rows - 1) * ySpacing + margemY;
+    const startY = Ytop;
+
+    const xOffset = - (cols * xSpacing) / 2 + xSpacing / 2;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -778,13 +862,13 @@ class SpaceInvaders {
   // Níveis “boss”: cria chefe e minions se for boss ≥ 2
   _createBossLevel() {
     const bossLevel = this.level / 5;
-    const boss = new Boss(this.scene, bossLevel);
+    const boss = new Boss(this.scene, bossLevel, this.renderer);
     this.enemies.push(boss);
 
     if (bossLevel >= 2) {
-      const minionCount   = bossLevel * 2;
-      const spacing       = 6;
-      const offset        = -(minionCount * spacing) / 2 + spacing / 2;
+      const minionCount = bossLevel * 2;
+      const spacing     = 6;
+      const offset      = -(minionCount * spacing) / 2 + spacing / 2;
       for (let i = 0; i < minionCount; i++) {
         const minion = new Enemy(this.scene, 1, i);
         minion.model.position.set(offset + i * spacing, 10, 0);
@@ -798,25 +882,25 @@ class SpaceInvaders {
   // Overlay “Nível Completo” com cut‐scene de transição
   _showLevelComplete() {
     this.levelTransitionActive = true;
-    this.gameStarted           = false;
+    this.gameStarted = false;
     if (this.el.hud) this.el.hud.style.display = 'none';
 
     this.barriers.forEach(b => b.remove());
-    this.barriers       = [];
+    this.barriers = [];
     this.playerBullets.forEach(b => this.scene.remove(b));
     this.enemyBullets.forEach(b => this.scene.remove(b));
-    this.playerBullets  = [];
-    this.enemyBullets   = [];
+    this.playerBullets = [];
+    this.enemyBullets = [];
 
     this.transitionStartTime = performance.now();
-    this.transitionDuration  = 5000; // 3s círculo + 2s entrada
+    this.transitionDuration  = 5000;
     this.transitionPhase     = 0;
 
-    const geo = new THREE.CylinderGeometry(6, 6, 2, 32);
-    const mat = new THREE.MeshPhongMaterial({ color: 0x6666ff, emissive: 0x222266 });
-    this.mothership = new THREE.Mesh(geo, mat);
-    this.mothership.position.set(0, 12, 0);
-    this.scene.add(this.mothership);
+    if (this.mothership) {
+      this.mothership.remove();
+    }
+    this.mothership = new MotherShip(this.scene, this.renderer);
+    this.mothership.model.position.set(0, 12, 0);
 
     this.circleRadius = 10;
     this.circleCenter.set(0, 2, 0);
@@ -825,10 +909,10 @@ class SpaceInvaders {
 
   // Remove mothership e posiciona jogador para exibir “Nível Completo” HTML
   _endLevelTransition() {
-    this.scene.remove(this.mothership);
-    this.mothership.geometry.dispose();
-    this.mothership.material.dispose();
-    this.mothership = null;
+    if (this.mothership) {
+      this.mothership.remove();
+      this.mothership = null;
+    }
 
     this.player.model.position.set(0, -8, 0);
     this.player.model.rotation.set(Math.PI * 1.2, Math.PI * 0.5, Math.PI);
@@ -854,9 +938,9 @@ class SpaceInvaders {
   // Overlay “Game Over”
   _showGameOver() {
     this.gameStarted = false;
-    if (this.el.finalScore)     this.el.finalScore.textContent     = `FINAL SCORE: ${this.score}`;
+    if (this.el.finalScore)      this.el.finalScore.textContent      = `FINAL SCORE: ${this.score}`;
     if (this.el.levelsCompleted) this.el.levelsCompleted.textContent = `LEVELS COMPLETED: ${this.level - 1}`;
-    if (this.el.gameOver)       this.el.gameOver.style.display     = 'flex';
+    if (this.el.gameOver)        this.el.gameOver.style.display      = 'flex';
 
     if (this.score > this.highScore) {
       this.highScore = this.score;
@@ -944,7 +1028,7 @@ class SpaceInvaders {
     this._lastFrameTime = now;
 
     this._update(delta);
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.activeCamera);
   }
 
   // Lógica de atualização a cada frame
@@ -965,7 +1049,7 @@ class SpaceInvaders {
       );
     }
 
-    // Se menu de seleção de nave ativo → apenas gira naves e anima câmara
+    // Se menu de seleção de nave ativo → apenas gira naves e anima câmera
     if (this.shipSelectionActive) {
       this.availableShips.forEach(s => {
         if (s.userData.selfSpin) s.rotation.y += 0.05;
@@ -973,24 +1057,24 @@ class SpaceInvaders {
       if (this.cameraLerp) {
         this.cameraLerp.t += 0.03;
         if (this.cameraLerp.t >= 1) {
-          this.camera.position.copy(this.cameraLerp.end);
+          this.activeCamera.position.copy(this.cameraLerp.end);
           this.cameraLerp = null;
         } else {
-          this.camera.position.lerpVectors(
+          this.activeCamera.position.lerpVectors(
             this.cameraLerp.start,
             this.cameraLerp.end,
             this.cameraLerp.t
           );
         }
-        this.camera.lookAt(this.chosenShip ? this.chosenShip.position : new THREE.Vector3(0, 0, 0));
+        this.activeCamera.lookAt(this.chosenShip ? this.chosenShip.position : new THREE.Vector3(0, 0, 0));
       }
       return;
     }
 
     // Se cut‐scene de transição de nível ativo → executa animação do círculo e entrada
     if (this.levelTransitionActive) {
-      const elapsed = (performance.now() - this.transitionStartTime) / this.transitionDuration;
       if (this.transitionPhase === 0) {
+        const elapsed = (performance.now() - this.transitionStartTime) / this.transitionDuration;
         const k = Math.min(elapsed / 0.6, 1);
         const angle = k * Math.PI * 2;
         this.player.model.position.set(
@@ -999,17 +1083,22 @@ class SpaceInvaders {
           0
         );
         this.player.model.rotation.y += 0.25;
+        if (this.mothership && this.mothership.update) {
+          this.mothership.update(delta);
+        }
         if (k >= 1) {
           this.transitionPhase   = 1;
           this.phase1StartTime   = performance.now();
         }
       } else {
-        const k = Math.min((performance.now() - this.phase1StartTime) / 2000, 1);
+        const k2 = Math.min((performance.now() - this.phase1StartTime) / 2000, 1);
         const pos = this.player.model.position.clone();
-        this.player.model.position.lerpVectors(pos, this.entryPoint, k);
+        this.player.model.position.lerpVectors(pos, this.entryPoint, k2);
         this.player.model.rotation.y += 0.15;
-        this.mothership.material.emissiveIntensity = 0.5 + 0.5 * Math.sin(k * Math.PI * 4);
-        if (k >= 1) this._endLevelTransition();
+        if (this.mothership && this.mothership.update) {
+          this.mothership.update(delta);
+        }
+        if (k2 >= 1) this._endLevelTransition();
       }
       return;
     }
@@ -1025,14 +1114,14 @@ class SpaceInvaders {
       if (bullet) this.playerBullets.push(bullet);
     }
 
-    // Atualiza câmara para seguir jogador (action-cam vs 2D)
+    // Atualiza câmera ativa para seguir jogador
     const playerPos = this.player.getPosition();
-    if (this.el.gameMode && this.el.gameMode.value === 'action-cam') {
-      this.camera.position.x = playerPos.x * 0.8;
-      this.camera.lookAt(playerPos.x * 0.8, 5, 0);
+    if (this.activeCamera === this.perspCamera) {
+      this.perspCamera.position.x = playerPos.x * 0.8;
+      this.perspCamera.lookAt(playerPos.x * 0.8, 5, 0);
     } else {
-      this.camera.position.x = playerPos.x * 0.8;
-      this.camera.lookAt(playerPos.x * 0.8, 0, 0);
+      this.orthoCamera.position.x = playerPos.x * 0.8;
+      this.orthoCamera.lookAt(playerPos.x * 0.8, 0, 0);
     }
 
     // Inimigos disparam aleatoriamente

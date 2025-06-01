@@ -895,39 +895,39 @@ updateSun(delta) {
         /* ---------- cut-scene em curso ---------- */
  /* ---------- MINI-FILME ENTRE NÍVEIS ---------- */
     if (this.levelTransitionActive) {
-
-        const now = performance.now();
-        const t   = (now - this.transitionStartTime) / this.transitionDuration;
-
-        if (this.transitionPhase === 0) {           // ── fase do círculo (0–0.6)
-            const k = Math.min(t / 0.6, 1);         // normaliza 0→1 nos 60 %
-            const angle = k * Math.PI * 2;          // volta completa
-            this.player.model.position.set(
-                this.circleCenter.x + this.circleRadius * Math.cos(angle),
-                this.circleCenter.y + 2 * Math.sin(angle), // pequena oscilação
-                0
-            );
-            this.player.model.rotation.y += 0.25;
-
-            if (k >= 1) {                           // mudou para fase 1
-                this.transitionPhase = 1;
-                this.phase1StartTime = now;
-            }
+        // 1) Fase 0: círculo
+        if (this.transitionPhase === 0) {
+        const elapsed = (performance.now() - this.transitionStartTime) / this.transitionDuration;
+        const k = Math.min(elapsed / 0.6, 1);
+        const angle = k * Math.PI * 2;
+        this.player.model.position.set(
+            this.circleCenter.x + this.circleRadius * Math.cos(angle),
+            this.circleCenter.y + 2 * Math.sin(angle),
+            0
+        );
+        this.player.model.rotation.y += 0.25;
+        // rotaciona a Death–Star neste meio‐tempo:
+        if (this.mothership && this.mothership.update) {
+            this.mothership.update(delta);
         }
-        else {                                      // ── fase de entrada (restantes 40 %)
-            const k = Math.min((now - this.phase1StartTime) / 2000, 1); // 2 s
-            const pos = this.player.model.position;
-            pos.lerpVectors(pos, this.entryPoint, k); // aproximação linear
-            this.player.model.rotation.y += 0.15;
-
-            /* pulsar da mothership */
-            this.mothership.material.emissiveIntensity = 0.5 + 0.5*Math.sin(k*Math.PI*4);
-
-            if (k >= 1) this.endLevelTransition();
+        if (k >= 1) {
+            this.transitionPhase   = 1;
+            this.phase1StartTime   = performance.now();
         }
-
-        this.renderer.render(this.scene, this.camera);
-        return;                                      // tudo parado fora da cena
+        } else {
+        // 2) Fase 1: entrada
+        const k2 = Math.min((performance.now() - this.phase1StartTime) / 2000, 1);
+        const pos = this.player.model.position.clone();
+        this.player.model.position.lerpVectors(pos, this.entryPoint, k2);
+        this.player.model.rotation.y += 0.15;
+        if (this.mothership && this.mothership.update) {
+            this.mothership.update(delta);
+        }
+        // pulso de emissive da Death–Star não existe mais, então pule isto
+        // if (this.mothership.material.emissiveIntensity) { … }
+        if (k2 >= 1) this._endLevelTransition();
+        }
+        return;
     }
 
 
@@ -1312,46 +1312,46 @@ updateSun(delta) {
     }
     // --------- MINI-FILME ENTRE NÍVEIS -----------------
     showLevelComplete() {
-
-        /* 1. pára o jogo e oculta HUD + restos de nível */
         this.levelTransitionActive = true;
-        this.gameStarted           = false;
-        document.getElementById('hud').style.display = 'none';
+        this.gameStarted = false;
+        if (this.el.hud) this.el.hud.style.display = 'none';
 
-        /* remove barreiras e balas para limpar o ecrã */
+        // Remove barreiras e balas antigas
         this.barriers.forEach(b => b.remove());
         this.barriers = [];
         this.playerBullets.forEach(b => this.scene.remove(b));
         this.enemyBullets.forEach(b => this.scene.remove(b));
         this.playerBullets = [];
-        this.enemyBullets  = [];
+        this.enemyBullets = [];
 
-        /* 2. momento de arranque + duração total */
         this.transitionStartTime = performance.now();
-        this.transitionDuration  = 5000;   // 3 s círculo + 2 s entrada
-        this.transitionPhase     = 0;      // começa no círculo
+        this.transitionDuration  = 5000; // duração da cut‐scene
+        this.transitionPhase     = 0;
 
-        /* 3. mothership (disco simples) */
-        const g = new THREE.CylinderGeometry(6, 6, 2, 32);
-        const m = new THREE.MeshPhongMaterial({ color: 0x6666ff, emissive: 0x222266 });
-        this.mothership = new THREE.Mesh(g, m);
-        this.mothership.position.set(0, 12, 0);
-        this.scene.add(this.mothership);
+        // ───── Substituição ─────
+        // Se já existia this.mothership anterior, remova primeiro
+        if (this.mothership) {
+            this.mothership.remove();
+        }
+        // Cria a Death–Star (passa this.renderer para texturas ficarem mais nítidas)
+        this.mothership = new MotherShip(this.scene, this.renderer);
+        // Posicione no local desejado (aprox. onde o cilindro ficava antes)
+        this.mothership.model.position.set(0, 12, 0);
+        // ─────────────────────────
 
-        /* 4. pontos do percurso */
-        this.circleRadius   = 10;
-        this.circleCenter   = new THREE.Vector3(0, 2, 0);
-        this.entryPoint     = new THREE.Vector3(0, 11, 0);   // boca da mothership
+        this.circleRadius = 10;
+        this.circleCenter.set(0, 2, 0);
+        this.entryPoint.set(0, 11, 0);
     }
 
 // ---------- fim cut-scene ----------
     endLevelTransition() {
 
         /* remover nave-mãe */
-        this.scene.remove(this.mothership);
-        this.mothership.geometry.dispose();
-        this.mothership.material.dispose();
-        this.mothership = null;
+        if (this.mothership) {
+            this.mothership.remove();
+            this.mothership = null;
+        }
 
         /* recoloca a nave do jogador em baixo */
        this.player.model.position.set(0, -8, 0);
